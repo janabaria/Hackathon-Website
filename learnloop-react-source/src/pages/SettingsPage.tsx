@@ -6,11 +6,61 @@ import { downloadJson, STORAGE_KEY } from '../services/storage';
 import { Modal, PageHeader } from '../components/ui';
 
 export function SettingsPage() {
-  const { data, commit, notify, recoveryError } = useApp();
+  const { data, commit, notify, recoveryError, cloud } = useApp();
   const [pendingImport, setPendingImport] = useState<AppData | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  if (cloud)
+    return (
+      <>
+        <PageHeader
+          title="Account settings"
+          description="Your settings, drafts, saved items, and progress sync privately to your account."
+        />
+        <section className="card settings-card">
+          <h2>Appearance</h2>
+          <div className="button-row">
+            {(['light', 'dark'] as const).map((theme) => (
+              <button
+                key={theme}
+                className="button secondary"
+                aria-pressed={data.settings.theme === theme}
+                onClick={async () =>
+                  void commit({ type: 'settings/update', settings: { ...data.settings, theme } })
+                }
+              >
+                {theme}
+              </button>
+            ))}
+          </div>
+          <label>
+            <input
+              type="checkbox"
+              checked={data.settings.roomyText}
+              onChange={(e) =>
+                void commit({
+                  type: 'settings/update',
+                  settings: { ...data.settings, roomyText: e.target.checked },
+                })
+              }
+            />
+            Roomier text spacing
+          </label>
+          <h2>Export</h2>
+          <p>
+            Download the loaded workspace. Shared posts and quizzes are included. Import and reset
+            are disabled for connected accounts.
+          </p>
+          <button
+            className="button secondary"
+            onClick={async () => downloadJson(data, 'learnloop-account-export.json')}
+          >
+            Export data
+          </button>
+        </section>
+      </>
+    );
   return (
     <>
       <PageHeader
@@ -28,8 +78,8 @@ export function SettingsPage() {
                 key={theme}
                 className={`button secondary ${data.settings.theme === theme ? 'selected' : ''}`}
                 aria-pressed={data.settings.theme === theme}
-                onClick={() =>
-                  commit({ type: 'settings/update', settings: { ...data.settings, theme } })
+                onClick={async () =>
+                  await commit({ type: 'settings/update', settings: { ...data.settings, theme } })
                 }
               >
                 {theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
@@ -41,8 +91,8 @@ export function SettingsPage() {
             <input
               type="checkbox"
               checked={data.settings.roomyText}
-              onChange={(e) =>
-                commit({
+              onChange={async (e) =>
+                await commit({
                   type: 'settings/update',
                   settings: { ...data.settings, roomyText: e.target.checked },
                 })
@@ -66,12 +116,12 @@ export function SettingsPage() {
           <div className="button-row">
             <button
               className="button secondary"
-              onClick={() => downloadJson(data, 'learnloop-data.json')}
+              onClick={async () => downloadJson(data, 'learnloop-data.json')}
             >
               <Download size={17} />
               Export data
             </button>
-            <button className="button secondary" onClick={() => input.current?.click()}>
+            <button className="button secondary" onClick={async () => input.current?.click()}>
               <Upload size={17} />
               Import JSON
             </button>
@@ -113,7 +163,7 @@ export function SettingsPage() {
           {recoveryError && (
             <button
               className="text-button"
-              onClick={() => {
+              onClick={async () => {
                 try {
                   downloadJson(
                     { raw: localStorage.getItem(STORAGE_KEY) },
@@ -130,7 +180,7 @@ export function SettingsPage() {
           <hr />
           <h3>Start with a clean workspace</h3>
           <p className="muted">Remove content and return to the empty starting point.</p>
-          <button className="text-button danger-text" onClick={() => setResetOpen(true)}>
+          <button className="text-button danger-text" onClick={async () => setResetOpen(true)}>
             Reset workspace
           </button>
         </section>
@@ -145,14 +195,14 @@ export function SettingsPage() {
           <div className="button-row">
             <button
               className="button secondary"
-              onClick={() => downloadJson(data, 'learnloop-before-import.json')}
+              onClick={async () => downloadJson(data, 'learnloop-before-import.json')}
             >
               Back up current data
             </button>
             <button
               className="button primary"
-              onClick={() => {
-                if (commit({ type: 'data/replace', data: pendingImport })) {
+              onClick={async () => {
+                if (await commit({ type: 'data/replace', data: pendingImport })) {
                   setPendingImport(null);
                   notify('Workspace imported.');
                 }
@@ -170,13 +220,13 @@ export function SettingsPage() {
             Export a backup first if you want to keep them.
           </p>
           <div className="button-row">
-            <button className="button secondary" onClick={() => setResetOpen(false)}>
+            <button className="button secondary" onClick={async () => setResetOpen(false)}>
               Keep my data
             </button>
             <button
               className="button danger"
-              onClick={() => {
-                if (commit({ type: 'data/replace', data: createEmptyData() })) {
+              onClick={async () => {
+                if (await commit({ type: 'data/replace', data: createEmptyData() })) {
                   setResetOpen(false);
                   notify('Workspace reset.');
                 }

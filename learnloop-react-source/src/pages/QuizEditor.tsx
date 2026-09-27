@@ -26,14 +26,14 @@ export function QuizEditor({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Create a quiz" onClose={onClose}>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           const result = quizSchema.safeParse({ id: newId(), title, topic, difficulty, questions });
           if (!result.success) {
             setError(result.error.issues[0].message);
             return;
           }
-          if (commit({ type: 'quiz/add', quiz: result.data })) {
+          if (await commit({ type: 'quiz/add', quiz: result.data })) {
             notify('Quiz added to your collection.');
             onClose();
           }

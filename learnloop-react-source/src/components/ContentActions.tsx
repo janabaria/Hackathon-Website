@@ -18,10 +18,12 @@ export function ContentActions({ content }: { content: Post | Reel }) {
         <button
           aria-label="Like"
           aria-pressed={content.liked}
-          onClick={() => commit({ type: 'content/toggle', id: content.id, field: 'liked' })}
+          onClick={async () =>
+            await commit({ type: 'content/toggle', id: content.id, field: 'liked' })
+          }
         >
           <Heart size={19} />
-          <span>{Number(content.liked)}</span>
+          <span>{content.likeCount ?? Number(content.liked)}</span>
         </button>
         <button aria-label="Comments" onClick={() => setCommentsOpen(true)}>
           <MessageCircle size={19} />
@@ -34,7 +36,9 @@ export function ContentActions({ content }: { content: Post | Reel }) {
         <button
           aria-label="Save"
           aria-pressed={content.saved}
-          onClick={() => commit({ type: 'content/toggle', id: content.id, field: 'saved' })}
+          onClick={async () =>
+            await commit({ type: 'content/toggle', id: content.id, field: 'saved' })
+          }
         >
           <Bookmark size={19} />
         </button>
@@ -54,11 +58,11 @@ export function ContentActions({ content }: { content: Post | Reel }) {
             )}
           </div>
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
               if (!text.trim()) return;
               if (
-                commit({
+                await commit({
                   type: 'comment/add',
                   comment: {
                     id: newId(),
@@ -90,7 +94,7 @@ export function ContentActions({ content }: { content: Post | Reel }) {
       {shareOpen && (
         <Modal title="Pass the learning on" onClose={() => setShareOpen(false)}>
           <p className="muted">
-            Copy the actual content to share. Posts in this workspace are stored on your device.
+            Copy the actual content to share. Share this learning with someone curious.
           </p>
           <label>
             Share text
@@ -101,7 +105,7 @@ export function ContentActions({ content }: { content: Post | Reel }) {
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(shareText);
-                commit({ type: 'content/share', id: content.id });
+                await commit({ type: 'content/share', id: content.id });
                 notify('Learning copied to clipboard.');
                 setShareOpen(false);
               } catch {

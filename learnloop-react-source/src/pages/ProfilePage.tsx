@@ -71,7 +71,7 @@ export function ProfilePage() {
             ) : (
               <button
                 className="button primary"
-                onClick={() => commit({ type: 'account/follow', id: profile.id })}
+                onClick={async () => await commit({ type: 'account/follow', id: profile.id })}
               >
                 {data.following.includes(profile.id) ? 'Following' : 'Follow'}
               </button>
@@ -186,10 +186,10 @@ function ProfileEditor({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Make this space yours" onClose={onClose}>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (
-            commit({
+            await commit({
               type: 'profile/update',
               profile: {
                 ...data.profile,

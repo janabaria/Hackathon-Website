@@ -31,11 +31,11 @@ export function StudioPage() {
       <div className="studio-grid">
         <form
           className="card editor-card"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (!text.trim() || !topic.trim() || published) return;
             if (
-              commit({
+              await commit({
                 type: 'post/add',
                 post: {
                   id: newId(),
@@ -51,7 +51,7 @@ export function StudioPage() {
               })
             ) {
               setPublished(true);
-              commit({ type: 'draft/save', text: '' });
+              await commit({ type: 'draft/save', text: '' });
               notify('Your explanation is in the feed.');
               navigate('/');
             }
@@ -88,8 +88,8 @@ export function StudioPage() {
             <button
               type="button"
               className="button secondary"
-              onClick={() => {
-                if (commit({ type: 'draft/save', text })) notify('Draft saved on this device.');
+              onClick={async () => {
+                if (await commit({ type: 'draft/save', text })) notify('Draft saved privately.');
               }}
             >
               <Save size={17} />

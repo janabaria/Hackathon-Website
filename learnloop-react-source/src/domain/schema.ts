@@ -27,6 +27,7 @@ const contentFields = {
   caption: z.string().trim().min(1).max(2000),
   createdAt: z.string().datetime(),
   liked: z.boolean(),
+  likeCount: z.number().int().nonnegative().optional(),
   saved: z.boolean(),
   shares: z.number().int().nonnegative(),
 };

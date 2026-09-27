@@ -33,10 +33,12 @@ function FocusRoom({ pod }: { pod: Pod }) {
   const timer = useFocusTimer(pod.minutes * 60);
   useEffect(() => {
     if (timer.complete && !recorded) {
-      if (commit({ type: 'session/complete', id: sessionId })) {
-        setRecorded(true);
-        notify('Focus session completed and saved.');
-      }
+      void commit({ type: 'session/complete', id: sessionId }).then((saved) => {
+        if (saved) {
+          setRecorded(true);
+          notify('Focus session completed and saved.');
+        }
+      });
     }
   }, [timer.complete, recorded, commit, sessionId, notify]);
   return (

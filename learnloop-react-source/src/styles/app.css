@@ -1708,3 +1708,276 @@ progress::-moz-progress-bar {
     scroll-behavior: auto !important;
   }
 }
+
+.reel-player-controls {
+  padding: 10px 14px;
+  background: #171827;
+  color: white;
+  display: grid;
+  gap: 8px;
+}
+.reel-control-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.reel-control-buttons button {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #62647d;
+  border-radius: 10px;
+  background: #292b43;
+  color: white;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.reel-control-buttons button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.reel-player-controls input[type='range'] {
+  width: 100%;
+  padding: 0;
+  accent-color: #a695ff;
+}
+
+/* Immersive portrait player: video fills the card; controls never consume video height. */
+.reels-shell {
+  width: min(430px, 100%);
+}
+.reels-track {
+  height: auto;
+  aspect-ratio: 9 / 16;
+  max-height: 820px;
+  border-radius: 28px;
+  box-shadow: 0 22px 64px #17122026;
+}
+.reel-card {
+  position: relative;
+  padding: 0;
+  display: block;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+.reel-card .video-stage {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  z-index: -2;
+}
+.reel-card .video-stage video {
+  object-fit: cover;
+}
+.reel-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #0005, transparent 25%, transparent 40%, #0008 68%, #000e);
+}
+.reel-card > .topic {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  background: #ffffff25;
+  border: 1px solid #ffffff35;
+  color: white;
+  backdrop-filter: blur(16px);
+  padding: 7px 12px;
+}
+.reel-card .reel-copy {
+  position: absolute;
+  left: 20px;
+  right: 78px;
+  bottom: 126px;
+  text-shadow: 0 2px 10px #0008;
+}
+.reel-copy h2 {
+  font-size: clamp(18px, 3vw, 23px);
+  line-height: 1.2;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.reel-copy p {
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 60px;
+  margin-bottom: 14px;
+}
+.reel-copy .avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+  border: 1px solid #fff8;
+}
+.reel-copy .author-name {
+  font-size: 13px;
+}
+.reel-social-rail {
+  position: absolute;
+  right: 12px;
+  bottom: 142px;
+}
+.reel-social-rail .content-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.reel-social-rail .content-actions button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin: 0;
+  color: white;
+  font-size: 11px;
+  text-shadow: 0 1px 5px #000;
+}
+.reel-social-rail .content-actions button svg {
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 2px 4px #0006);
+}
+.reel-social-rail .content-actions button[aria-pressed='true'] {
+  color: #c3b1ff;
+}
+.reel-social-rail .content-actions button[aria-pressed='true'] svg {
+  fill: currentColor;
+}
+.reel-player-controls {
+  position: absolute;
+  bottom: 14px;
+  left: 18px;
+  right: 18px;
+  background: transparent;
+  padding: 0;
+  gap: 6px;
+}
+.reel-control-buttons {
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: nowrap;
+}
+.reel-control-buttons button {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffffff25;
+  border-radius: 50%;
+  background: #ffffff14;
+  backdrop-filter: blur(18px);
+  transition:
+    background 0.18s,
+    transform 0.18s;
+}
+.reel-control-buttons button:hover {
+  background: #ffffff30;
+  transform: scale(1.07);
+}
+.reel-control-buttons button:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+.reel-control-buttons .reel-play-button {
+  width: 48px;
+  height: 48px;
+  color: #211632;
+  background: white;
+  border: 0;
+}
+.reel-control-buttons .reel-play-button:hover {
+  background: #e5dcff;
+}
+.seek-number {
+  position: absolute;
+  font-size: 8px;
+  font-weight: 700;
+  top: 17px;
+  line-height: 1;
+  pointer-events: none;
+}
+.reel-player-controls input[type='range'] {
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  accent-color: white;
+  border: 0;
+}
+.reel-player-controls small {
+  color: #ffffffb3;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.reel-player-controls > .button {
+  position: absolute;
+  bottom: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 100%;
+  font-size: 12px;
+  background: #ffffffed;
+  color: #241639;
+  box-shadow: 0 4px 24px #0004;
+}
+.reel-navigation {
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* Touch devices keep controls visible; mouse users reveal them on hover. */
+@media (hover: hover) and (pointer: fine) {
+  .reel-player-controls > :not(.button) {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .reel-card:hover .reel-player-controls > :not(.button),
+  .reel-card:has(:focus-visible) .reel-player-controls > :not(.button) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (max-width: 767px) {
+  .reels-shell {
+    width: min(100%, 430px);
+  }
+  .reels-track {
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 9 / 16;
+    border-radius: 20px;
+  }
+  .reel-card {
+    padding: 0;
+  }
+  .reel-card .reel-copy {
+    left: 16px;
+    right: 68px;
+  }
+  .reel-control-buttons {
+    gap: 14px;
+  }
+  .reel-card > .topic {
+    left: 16px;
+    top: 16px;
+  }
+}

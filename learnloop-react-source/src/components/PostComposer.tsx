@@ -13,11 +13,11 @@ export function PostComposer({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Share a little learning" onClose={onClose}>
       <form
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           if (!caption.trim() || !topic.trim()) return;
           if (
-            commit({
+            await commit({
               type: 'post/add',
               post: {
                 id: newId(),

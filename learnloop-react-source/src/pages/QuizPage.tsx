@@ -47,7 +47,7 @@ function QuizRunner({ quiz }: { quiz: Quiz }) {
         <div className="button-row">
           <button
             className="button primary"
-            onClick={() => {
+            onClick={async () => {
               setAnswers([]);
               setSelected(null);
             }}
@@ -106,11 +106,11 @@ function QuizRunner({ quiz }: { quiz: Quiz }) {
             </div>
             <button
               className="button primary"
-              onClick={() => {
+              onClick={async () => {
                 const next = [...answers, selected];
                 if (
                   next.length === quiz.questions.length &&
-                  !commit({ type: 'quiz/complete', id: quiz.id, answers: next })
+                  !(await commit({ type: 'quiz/complete', id: quiz.id, answers: next }))
                 )
                   return;
                 setAnswers(next);

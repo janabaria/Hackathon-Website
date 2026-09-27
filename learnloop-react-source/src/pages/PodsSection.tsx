@@ -58,11 +58,11 @@ export function PodsSection({ initialGoal }: { initialGoal: string }) {
       {open && (
         <Modal title="Create a focus pod" onClose={() => setOpen(false)}>
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
               if (!title.trim() || !goal.trim()) return;
               if (
-                commit({
+                await commit({
                   type: 'pod/add',
                   pod: { id: newId(), title: title.trim(), goal: goal.trim(), minutes, vibe },
                 })

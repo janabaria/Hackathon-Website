@@ -64,7 +64,7 @@ export function SearchPage() {
                 {person.id !== data.profile.id && (
                   <button
                     className="chip"
-                    onClick={() => commit({ type: 'account/follow', id: person.id })}
+                    onClick={async () => await commit({ type: 'account/follow', id: person.id })}
                   >
                     {data.following.includes(person.id) ? 'Following' : 'Follow'}
                   </button>
