@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "profile": { "id": "local-profile", "name": "", "bio": "", "interests": [], "skills": [] },
+  "accounts": [],
+  "posts": [],
+  "reels": [],
+  "quizzes": [],
+  "pods": [],
+  "comments": [],
+  "following": [],
+  "completedSessions": [],
+  "quizResults": {},
+  "draft": "",
+  "settings": { "theme": "light", "roomyText": false }
+}
