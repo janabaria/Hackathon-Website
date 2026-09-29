@@ -1,0 +1,8 @@
+[functions.delete-account]
+verify_jwt = false
+
+[functions.generate-learning]
+verify_jwt = false
+
+[functions.review-post]
+verify_jwt = false

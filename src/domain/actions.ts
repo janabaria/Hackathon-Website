@@ -1,0 +1,250 @@
+import type { AppData, Comment, Pod, Post, Profile, Quiz, Reel, Notebook, Exam } from './schema';
+
+export type Action =
+  | { type: 'notebook/save'; notebook: Notebook }
+  | { type: 'notebook/delete'; id: string }
+  | { type: 'exam/save'; exam: Exam }
+  | { type: 'exam/delete'; id: string }
+  | { type: 'reminder/dismiss'; id: string }
+  | { type: 'content/delete'; id: string }
+  | { type: 'comment/delete'; id: string }
+  | { type: 'comment/like'; id: string }
+  | { type: 'pod/delete'; id: string }
+  | { type: 'pod/request'; podId: string }
+  | { type: 'pod/respond'; podId: string; userId: string; status: 'approved' | 'rejected' }
+  | { type: 'post/add'; post: Post }
+  | { type: 'reel/add'; reel: Reel }
+  | { type: 'quiz/add'; quiz: Quiz }
+  | { type: 'pod/add'; pod: Pod }
+  | { type: 'content/toggle'; id: string; field: 'liked' | 'saved' }
+  | { type: 'content/share'; id: string }
+  | { type: 'comment/add'; comment: Comment }
+  | { type: 'profile/update'; profile: Profile }
+  | { type: 'account/follow'; id: string }
+  | { type: 'session/complete'; id: string }
+  | { type: 'quiz/complete'; id: string; answers: number[] }
+  | { type: 'draft/save'; text: string }
+  | { type: 'settings/update'; settings: AppData['settings'] }
+  | { type: 'data/replace'; data: AppData };
+
+/** Pure state transitions. UI components never mutate a stored record. */
+
+export function reduceData(state: AppData, action: Action): AppData {
+  switch (action.type) {
+    case 'notebook/save':
+      return {
+        ...state,
+        notebooks: [...state.notebooks.filter((n) => n.id !== action.notebook.id), action.notebook],
+      };
+
+    case 'notebook/delete':
+      return { ...state, notebooks: state.notebooks.filter((n) => n.id !== action.id) };
+
+    case 'exam/save':
+      return {
+        ...state,
+        exams: [...state.exams.filter((n) => n.id !== action.exam.id), action.exam],
+      };
+
+    case 'exam/delete':
+      return { ...state, exams: state.exams.filter((n) => n.id !== action.id) };
+
+    case 'reminder/dismiss':
+      return {
+        ...state,
+        dismissedReminders: [...new Set([...state.dismissedReminders, action.id])],
+      };
+
+    case 'content/delete': {
+      const content = [...state.posts, ...state.reels].find((p) => p.id === action.id);
+
+      if (!content || content.authorId !== state.profile.id)
+        throw new Error('You can only delete your own content.');
+
+      return {
+        ...state,
+        posts: state.posts.filter((p) => p.id !== action.id),
+        reels: state.reels.filter((p) => p.id !== action.id),
+        comments: state.comments.filter((c) => c.contentId !== action.id),
+      };
+    }
+
+    case 'comment/delete':
+      if (!state.comments.some((c) => c.id === action.id && c.authorId === state.profile.id))
+        throw new Error('You can only delete your own discussion.');
+
+      return { ...state, comments: state.comments.filter((c) => c.id !== action.id) };
+
+    case 'pod/delete':
+      if (
+        !state.pods.some(
+          (p) => p.id === action.id && (p.authorId ?? state.profile.id) === state.profile.id,
+        )
+      )
+        throw new Error('You can only delete your own pod.');
+
+      return {
+        ...state,
+        pods: state.pods.filter((p) => p.id !== action.id),
+        podRequests: state.podRequests.filter((r) => r.podId !== action.id),
+      };
+
+    case 'pod/request': {
+      const pod = state.pods.find((p) => p.id === action.podId);
+
+      if (
+        !pod ||
+        pod.authorId === state.profile.id ||
+        state.podRequests.some((r) => r.podId === pod.id && r.userId === state.profile.id)
+      )
+        return state;
+
+      return {
+        ...state,
+        podRequests: [
+          ...state.podRequests,
+          { podId: pod.id, userId: state.profile.id, status: 'pending' },
+        ],
+      };
+    }
+
+    case 'pod/respond':
+      if (!state.pods.some((p) => p.id === action.podId && p.authorId === state.profile.id))
+        throw new Error('Only the pod creator can review requests.');
+
+      return {
+        ...state,
+        podRequests: state.podRequests.map((r) =>
+          r.podId === action.podId && r.userId === action.userId
+            ? { ...r, status: action.status }
+            : r,
+        ),
+      };
+
+    case 'post/add':
+      return { ...state, posts: [action.post, ...state.posts] };
+
+    case 'reel/add':
+      return { ...state, reels: [action.reel, ...state.reels] };
+
+    case 'quiz/add':
+      return { ...state, quizzes: [...state.quizzes, action.quiz] };
+
+    case 'pod/add':
+      return { ...state, pods: [...state.pods, action.pod] };
+
+    case 'content/toggle':
+      return {
+        ...state,
+
+        posts: state.posts.map((p) =>
+          p.id === action.id
+            ? {
+                ...p,
+                [action.field]: !p[action.field],
+                ...(action.field === 'liked'
+                  ? {
+                      likeCount: Math.max(0, (p.likeCount ?? Number(p.liked)) + (p.liked ? -1 : 1)),
+                    }
+                  : {}),
+              }
+            : p,
+        ),
+
+        reels: state.reels.map((p) =>
+          p.id === action.id
+            ? {
+                ...p,
+                [action.field]: !p[action.field],
+                ...(action.field === 'liked'
+                  ? {
+                      likeCount: Math.max(0, (p.likeCount ?? Number(p.liked)) + (p.liked ? -1 : 1)),
+                    }
+                  : {}),
+              }
+            : p,
+        ),
+      };
+
+    case 'content/share':
+      return {
+        ...state,
+
+        posts: state.posts.map((p) => (p.id === action.id ? { ...p, shares: p.shares + 1 } : p)),
+
+        reels: state.reels.map((p) => (p.id === action.id ? { ...p, shares: p.shares + 1 } : p)),
+      };
+
+    case 'comment/like':
+      return {
+        ...state,
+        comments: state.comments.map((c) =>
+          c.id === action.id
+            ? {
+                ...c,
+                liked: !c.liked,
+                likeCount: Math.max(0, (c.likeCount ?? Number(!!c.liked)) + (c.liked ? -1 : 1)),
+              }
+            : c,
+        ),
+      };
+    case 'comment/add':
+      return { ...state, comments: [...state.comments, action.comment] };
+
+    case 'profile/update':
+      return { ...state, profile: action.profile };
+
+    case 'account/follow':
+      if (action.id === state.profile.id || !state.accounts.some((a) => a.id === action.id))
+        return state;
+
+      return {
+        ...state,
+
+        following: state.following.includes(action.id)
+          ? state.following.filter((id) => id !== action.id)
+          : [...state.following, action.id],
+      };
+
+    case 'session/complete':
+      return state.completedSessions.includes(action.id)
+        ? state
+        : { ...state, completedSessions: [...state.completedSessions, action.id] };
+
+    case 'quiz/complete': {
+      const quiz = state.quizzes.find((q) => q.id === action.id);
+
+      if (
+        !quiz ||
+        action.answers.length !== quiz.questions.length ||
+        action.answers.some((a) => !Number.isInteger(a) || a < 0 || a > 3)
+      )
+        return state;
+
+      const score = quiz.questions.filter(
+        (q, index) => q.correctIndex === action.answers[index],
+      ).length;
+
+      const best = Math.max(state.quizResults[quiz.id]?.score ?? 0, score);
+
+      return {
+        ...state,
+
+        quizResults: {
+          ...state.quizResults,
+
+          [quiz.id]: { score: best, total: quiz.questions.length },
+        },
+      };
+    }
+
+    case 'draft/save':
+      return { ...state, draft: action.text };
+
+    case 'settings/update':
+      return { ...state, settings: action.settings };
+
+    case 'data/replace':
+      return action.data;
+  }
+}
