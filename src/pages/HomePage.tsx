@@ -17,6 +17,7 @@ export function HomePage({ onCreate }: { onCreate: () => void }) {
     (p) =>
       (!filter || p.topic === filter) && (!followingOnly || data.following.includes(p.authorId)),
   );
+  visible.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const pods = params.get('tab') === 'pods';
   return (
     <>
@@ -24,12 +25,6 @@ export function HomePage({ onCreate }: { onCreate: () => void }) {
         eyebrow="DISCOVER SOMETHING NEW"
         title="Your learning starts here."
         description="A space for good questions and small discoveries."
-        action={
-          <button className="button primary" onClick={onCreate}>
-            <Plus size={18} />
-            <T>Create post</T>
-          </button>
-        }
       />
       <div className="page-tabs" role="tablist" aria-label="Home view">
         <button role="tab" aria-selected={!pods} onClick={() => setParams({})}>

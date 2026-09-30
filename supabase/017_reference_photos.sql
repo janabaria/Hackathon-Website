@@ -1,0 +1,6 @@
+-- Add credited, non-AI reference photographs to existing starter posts only.
+begin;
+update public.posts set image='https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/Kneading.jpg/500px-Kneading.jpg' where id='8c071fc0-0a70-f2b9-56f5-16371b9007f7' and author_id='6b3620e1-a20f-4014-97b0-ea5406b7d984' and kind='post' and (image='' or image like '/learning-assets/%');
+update public.posts set image='https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/Sewing_Machine.JPG/960px-Sewing_Machine.JPG' where id='1271f848-c76a-43e9-f991-e61bd74b1908' and author_id='947e6e09-83f2-4c0c-a194-fd4e7fa40f20' and kind='post' and (image='' or image like '/learning-assets/%');
+update public.posts set image='https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Francesco_Gallarotti_2016-03-09_%28Unsplash_Bfdia-aJOvI%29.jpg/1280px-Francesco_Gallarotti_2016-03-09_%28Unsplash_Bfdia-aJOvI%29.jpg' where id='b71c51be-873b-372e-5f9c-5a8232c16d0d' and author_id='ef717f18-5802-4121-b4cd-d14d714302cc' and kind='post' and (image='' or image like '/learning-assets/%');
+commit;

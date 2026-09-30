@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { Video } from 'lucide-react';
 import type { Reel } from '../domain/schema';
 import { playableVideoUrl } from '../services/reelMedia';
-export function ReelPreview({ reel }: { reel: Reel }) {
+export function ReelPreview({
+  reel,
+}: {
+  reel: Pick<Reel, 'title' | 'topic' | 'videoUrl' | 'thumbnail'>;
+}) {
   const [src, setSrc] = useState('');
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -23,8 +27,8 @@ export function ReelPreview({ reel }: { reel: Reel }) {
   }, [reel.thumbnail, reel.videoUrl]);
   return (
     <div className="reel-preview-media">
-      {reel.thumbnail ? (
-        <img src={reel.thumbnail} alt={reel.title} loading="lazy" />
+      {reel.thumbnail && !failed ? (
+        <img src={reel.thumbnail} alt={reel.title} loading="lazy" onError={() => setFailed(true)} />
       ) : src && !failed ? (
         <video
           src={src}

@@ -90,7 +90,7 @@ export function usePodRoom(podId: string, userId: string, owner: boolean) {
           .upsert({ pod_id: podId }, { onConflict: 'pod_id', ignoreDuplicates: true });
         if (created.error) setError(created.error.message);
       }
-      void sync();
+      if (!stopped) void sync();
     })();
     return () => {
       stopped = true;

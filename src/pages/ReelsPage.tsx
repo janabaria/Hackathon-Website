@@ -1,3 +1,4 @@
+import { EditContentButton } from '../components/EditContent';
 import { ReelPreview } from '../components/ReelPreview';
 import { VideoThumbnail } from '../components/VideoThumbnail';
 import { T } from '../lib/i18n';
@@ -24,7 +25,20 @@ import type { Reel } from '../domain/schema';
 import { playableVideoUrl, uploadReelVideo, validateVideo } from '../services/reelMedia';
 export function ReelsPage() {
   const { data, commit, notify } = useApp();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('create') === '1') {
+      setOpen(true);
+      const next = new URLSearchParams(params);
+      next.delete('create');
+      setParams(next, { replace: true });
+    }
+  }, [params, setParams]);
+  // Stable random ranks for this visit: reactions never shuffle the playing reel.
+  const ranks = useRef(new Map<string, number>());
+  for (const reel of data.reels)
+    if (!ranks.current.has(reel.id)) ranks.current.set(reel.id, Math.random());
+  const reels = [...data.reels].sort((a, b) => ranks.current.get(a.id)! - ranks.current.get(b.id)!);
   const targetId = params.get('id');
   const [open, setOpen] = useState(false);
   const [browse, setBrowse] = useState(false);
@@ -32,17 +46,17 @@ export function ReelsPage() {
   const [muted, setMuted] = useState(false);
   const track = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const targetIndex = targetId ? data.reels.findIndex((r) => r.id === targetId) : -1;
+    const targetIndex = targetId ? reels.findIndex((r) => r.id === targetId) : -1;
     if (targetIndex >= 0) {
       setIndex(targetIndex);
       track.current?.scrollTo({ top: targetIndex * track.current.clientHeight });
-    } else if (index >= data.reels.length) {
-      setIndex(Math.max(0, data.reels.length - 1));
+    } else if (index >= reels.length) {
+      setIndex(Math.max(0, reels.length - 1));
       track.current?.scrollTo({
-        top: Math.max(0, data.reels.length - 1) * track.current.clientHeight,
+        top: Math.max(0, reels.length - 1) * track.current.clientHeight,
       });
     }
-  }, [targetId, data.reels.length]);
+  }, [targetId, reels.length]);
   const [title, setTitle] = useState('');
   const [thumbnail, setThumbnail] = useState('');
   const [thumbnailBusy, setThumbnailBusy] = useState(false);
@@ -66,9 +80,10 @@ export function ReelsPage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
   const move = (direction: number) =>
-    track.current?.children[
-      Math.max(0, Math.min(data.reels.length - 1, index + direction))
-    ]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    track.current?.scrollTo({
+      top: Math.max(0, Math.min(reels.length - 1, index + direction)) * track.current.clientHeight,
+      behavior: 'smooth',
+    });
   return (
     <>
       <div className="reels-toolbar">
@@ -86,7 +101,7 @@ export function ReelsPage() {
       {browse && (
         <Modal title="Browse reels" onClose={() => setBrowse(false)}>
           <div className="reels-browse-grid">
-            {data.reels.map((reel, i) => (
+            {reels.map((reel, i) => (
               <button
                 key={reel.id}
                 className="reel-browse-item"
@@ -104,10 +119,10 @@ export function ReelsPage() {
               </button>
             ))}
           </div>
-          {!data.reels.length && <p>No reels yet.</p>}
+          {!reels.length && <p>No reels yet.</p>}
         </Modal>
       )}
-      {data.reels.length ? (
+      {reels.length ? (
         <div className="reels-shell">
           <div
             className="reels-track"
@@ -117,7 +132,7 @@ export function ReelsPage() {
                 setIndex(Math.round(track.current.scrollTop / track.current.clientHeight));
             }}
           >
-            {data.reels.map((reel, i) => (
+            {reels.map((reel, i) => (
               <ReelCard
                 key={reel.id}
                 reel={reel}
@@ -136,13 +151,10 @@ export function ReelsPage() {
             >
               <ChevronUp />
             </button>
-            <span>
-              {index + 1} / {data.reels.length}
-            </span>
             <button
               className="icon-button"
               aria-label="Next reel"
-              disabled={index === data.reels.length - 1}
+              disabled={index === reels.length - 1}
               onClick={() => move(1)}
             >
               <ChevronDown />
@@ -188,11 +200,12 @@ export function ReelsPage() {
                   mediaUrl = uploadedUrl || (await uploadReelVideo(file!, data.profile.id));
                   setUploadedUrl(mediaUrl);
                 }
+                const reelId = newId();
                 if (
                   await commit({
                     type: 'reel/add',
                     reel: {
-                      id: newId(),
+                      id: reelId,
                       authorId: data.profile.id,
                       title: title.trim(),
                       caption: caption.trim(),
@@ -214,8 +227,7 @@ export function ReelsPage() {
                   setVideoUrl('');
                   setFile(null);
                   setUploadedUrl('');
-                  setIndex(0);
-                  track.current?.scrollTo(0, 0);
+                  setParams({ id: reelId });
                   notify('Reel added.');
                 } else {
                   setFormError(
@@ -264,7 +276,7 @@ export function ReelsPage() {
                 </button>
               </div>
               {source === 'file' ? (
-                <label>
+                <label key="video-file">
                   <T>Video file</T>
                   <input
                     type="file"
@@ -305,7 +317,7 @@ export function ReelsPage() {
                   )}
                 </label>
               ) : (
-                <label>
+                <label key="video-url">
                   <T>Video URL</T>
                   <input
                     type="url"
@@ -443,7 +455,10 @@ function ReelCard({
       <Topic topic={reel.topic} />
       {reel.authorId === data.profile.id && (
         <div className="reel-delete">
-          <DeleteButton label="reel" action={{ type: 'content/delete', id: reel.id }} />
+          <div className="button-row">
+            <EditContentButton content={reel} />
+            <DeleteButton label="reel" action={{ type: 'content/delete', id: reel.id }} />
+          </div>
         </div>
       )}
       <div className="video-stage">

@@ -16,8 +16,10 @@ export function storedVideoPath(
   try {
     const parsed = new URL(url);
     const base = new URL(projectUrl);
-    const prefix = `/storage/v1/object/authenticated/${REEL_BUCKET}/`;
-    return parsed.origin === base.origin && parsed.pathname.startsWith(prefix)
+    const prefix = ['authenticated', 'public', 'sign']
+      .map((kind) => `/storage/v1/object/${kind}/${REEL_BUCKET}/`)
+      .find((value) => parsed.pathname.startsWith(value));
+    return parsed.origin === base.origin && prefix
       ? decodeURIComponent(parsed.pathname.slice(prefix.length))
       : null;
   } catch {

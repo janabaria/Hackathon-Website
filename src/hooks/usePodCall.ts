@@ -17,6 +17,7 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
   const local = useRef<MediaStream | null>(null);
   const peers = useRef(new Map<string, Peer>());
   const live = useRef(true);
+  const requestVersion = useRef(0);
   const activeIds = members
     .filter((m) => m.in_call && m.id !== connectionId)
     .map((m) => m.id)
@@ -25,6 +26,8 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
   const memberIds = useRef(activeIds);
   memberIds.current = activeIds;
   const leave = useCallback(() => {
+    requestVersion.current += 1;
+    setBusy(false);
     local.current?.getTracks().forEach((t) => t.stop());
     local.current = null;
     setStream(null);
@@ -45,11 +48,12 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
   }, [leave]);
   const join = async (video: boolean) => {
     if (busy || !connectionId) return;
+    const version = ++requestVersion.current;
     setBusy(true);
     setError('');
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true, video });
-      if (!live.current) {
+      if (!live.current || version !== requestVersion.current) {
         media.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -61,7 +65,7 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
         media.getTracks().forEach((t) => t.stop());
         throw result.error;
       }
-      if (!live.current) {
+      if (!live.current || version !== requestVersion.current) {
         media.getTracks().forEach((t) => t.stop());
         void supabase!.from('pod_presence').update({ in_call: false }).eq('id', connectionId);
         return;
@@ -71,9 +75,10 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
       setMic(true);
       setCamera(video);
     } catch (e) {
-      setError((e as Error).message || 'Camera or microphone access was denied.');
+      if (live.current && version === requestVersion.current)
+        setError((e as Error).message || 'Camera or microphone access was denied.');
     } finally {
-      setBusy(false);
+      if (live.current && version === requestVersion.current) setBusy(false);
     }
   };
   useEffect(() => {
@@ -202,17 +207,18 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
     setMic(enabled);
   };
   const toggleCamera = async () => {
-    if (!local.current) return;
+    if (!local.current || busy) return;
     const existing = local.current.getVideoTracks()[0];
     if (existing) {
       existing.enabled = !camera;
       setCamera(!camera);
       return;
     }
+    const version = ++requestVersion.current;
     setBusy(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (!live.current || !local.current) {
+      if (!live.current || version !== requestVersion.current || !local.current) {
         media.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -225,9 +231,9 @@ export function usePodCall(podId: string, connectionId: string, members: Member[
           ?.sender.replaceTrack(track);
       setCamera(true);
     } catch (e) {
-      setError((e as Error).message);
+      if (live.current && version === requestVersion.current) setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (live.current && version === requestVersion.current) setBusy(false);
     }
   };
   return { stream, remote, error, busy, mic, camera, join, leave, toggleMic, toggleCamera };

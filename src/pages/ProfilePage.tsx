@@ -1,3 +1,4 @@
+import { PostComposer } from '../components/PostComposer';
 import { ReelPreview } from '../components/ReelPreview';
 import { T } from '../lib/i18n';
 import { InterestPicker } from '../components/InterestPicker';
@@ -8,11 +9,11 @@ import { useState } from 'react';
 
 import { Link, useParams } from 'react-router-dom';
 
-import { Bookmark, CircleUserRound, Edit3, PenLine, Settings2, Video } from 'lucide-react';
+import { Bookmark, CircleUserRound, Edit3, PenLine, Settings2, Plus } from 'lucide-react';
 
 import { useApp } from '../state/AppProvider';
 
-import { EmptyState, Modal, PageHeader, Topic } from '../components/ui';
+import { Avatar, EmptyState, Modal, PageHeader, Topic } from '../components/ui';
 
 import { PostCard } from '../components/PostCard';
 
@@ -21,13 +22,15 @@ import { displayName, initials, parseTags, readImage } from '../lib/utils';
 export function ProfilePage() {
   const { id } = useParams();
 
-  const { data, commit } = useApp();
+  const { data, commit, cloud, pending, signOut } = useApp();
 
   const profile = [data.profile, ...data.accounts].find((p) => p.id === (id ?? data.profile.id));
 
   const [tab, setTab] = useState('Posts');
 
   const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [peopleList, setPeopleList] = useState<'Following' | 'Followers' | null>(null);
 
   if (!profile)
     return (
@@ -47,6 +50,15 @@ export function ProfilePage() {
     );
 
   const own = profile.id === data.profile.id;
+  const followingIds = own
+    ? data.following
+    : data.followEdges.filter((e) => e.userId === profile.id).map((e) => e.targetId);
+  const followerIds = data.followEdges
+    .filter((e) => e.targetId === profile.id)
+    .map((e) => e.userId);
+  const listed = [data.profile, ...data.accounts].filter((p) =>
+    (peopleList === 'Following' ? followingIds : followerIds).includes(p.id),
+  );
 
   const posts = data.posts.filter((p) => (tab === 'Saved' ? p.saved : p.authorId === profile.id));
 
@@ -75,6 +87,15 @@ export function ProfilePage() {
         }
       />
 
+      {own && cloud && (
+        <button
+          className="button secondary profile-signout"
+          disabled={pending}
+          onClick={() => void signOut()}
+        >
+          Sign out
+        </button>
+      )}
       <section className="card profile-card">
         <div className="profile-cover">
           <span>
@@ -132,13 +153,14 @@ export function ProfilePage() {
                   <strong>{data.completedSessions.length}</strong>
                   <T>Focus sessions</T>
                 </span>
-
-                <span>
-                  <strong>{data.following.length}</strong>
-                  <T>Following</T>
-                </span>
               </>
             )}
+            <button className="stat-button" onClick={() => setPeopleList('Following')}>
+              <strong>{followingIds.length}</strong>Following
+            </button>
+            <button className="stat-button" onClick={() => setPeopleList('Followers')}>
+              <strong>{followerIds.length}</strong>Followers
+            </button>
           </div>
 
           <div className="profile-tags">
@@ -199,27 +221,42 @@ export function ProfilePage() {
         ))}
       </div>
 
-      <div className="profile-content">
-        {tab !== 'Reels' && posts.map((post) => <PostCard key={post.id} post={post} />)}
-
-        {tab !== 'Posts' &&
-          reels.map((reel) => (
-            <Link className="card reel-preview" to={`/reels?id=${reel.id}`} key={reel.id}>
-              <ReelPreview reel={reel} />
-              <Video size={28} />
-
-              <Topic topic={reel.topic} />
-
-              <h2>{reel.title}</h2>
-
-              <p>{reel.caption}</p>
-
-              <span>
-                <T>Open reels →</T>
-              </span>
+      {own && tab !== 'Saved' && (
+        <div className="profile-create">
+          {tab === 'Posts' ? (
+            <button className="button primary" onClick={() => setCreating(true)}>
+              <Plus size={18} />
+              Create post
+            </button>
+          ) : (
+            <Link className="button primary" to="/reels?create=1">
+              <Plus size={18} />
+              Create reel
             </Link>
+          )}
+        </div>
+      )}
+      {tab !== 'Reels' && (
+        <div className="profile-content profile-posts-list">
+          {tab === 'Saved' && posts.length > 0 && <h2>Saved posts</h2>}
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
           ))}
-      </div>
+        </div>
+      )}
+      {tab !== 'Posts' && (
+        <>
+          {tab === 'Saved' && reels.length > 0 && <h2>Saved reels</h2>}
+          <div className="profile-content profile-reels-gallery">
+            {reels.map((reel) => (
+              <Link className="card reel-preview" to={`/reels?id=${reel.id}`} key={reel.id}>
+                <ReelPreview reel={reel} />
+                <h2>{reel.title}</h2>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       {((tab === 'Posts' && !posts.length) ||
         (tab === 'Reels' && !reels.length) ||
@@ -239,6 +276,39 @@ export function ProfilePage() {
 
       {own && <DeleteAccount />}
 
+      {creating && <PostComposer onClose={() => setCreating(false)} />}
+      {peopleList && (
+        <Modal title={peopleList} onClose={() => setPeopleList(null)}>
+          <div className="follow-list">
+            {listed.length ? (
+              listed.map((person) => (
+                <div className="follow-person" key={person.id}>
+                  <div onClick={() => setPeopleList(null)}>
+                    <Avatar id={person.id} />
+                    <Avatar id={person.id} nameOnly />
+                  </div>
+                  {person.id !== data.profile.id && (
+                    <button
+                      className="button secondary"
+                      disabled={pending}
+                      aria-pressed={data.following.includes(person.id)}
+                      onClick={() => void commit({ type: 'account/follow', id: person.id })}
+                    >
+                      {data.following.includes(person.id) ? 'Unfollow' : 'Follow'}
+                    </button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="muted">
+                {peopleList === 'Following'
+                  ? 'No followed accounts yet. Explore a profile to start connecting.'
+                  : 'No followers yet. Share something you learned to start a conversation.'}
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
       {editing && <ProfileEditor onClose={() => setEditing(false)} />}
     </>
   );

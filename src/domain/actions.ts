@@ -1,6 +1,35 @@
-import type { AppData, Comment, Pod, Post, Profile, Quiz, Reel, Notebook, Exam } from './schema';
+import type {
+  Maze,
+  AppData,
+  Comment,
+  Pod,
+  Post,
+  Profile,
+  Quiz,
+  Reel,
+  Notebook,
+  Exam,
+} from './schema';
 
 export type Action =
+  | {
+      type: 'content/edit';
+      id: string;
+      changes: {
+        caption: string;
+        topic: string;
+        title?: string;
+        thumbnail?: string;
+        image?: string;
+        videoUrl?: string;
+      };
+    }
+  | { type: 'comment/edit'; id: string; text: string }
+  | { type: 'pod/edit'; pod: Pod }
+  | { type: 'quiz/edit'; quiz: Quiz }
+  | { type: 'quiz/delete'; id: string }
+  | { type: 'maze/save'; maze: Maze }
+  | { type: 'maze/delete'; id: string }
   | { type: 'notebook/save'; notebook: Notebook }
   | { type: 'notebook/delete'; id: string }
   | { type: 'exam/save'; exam: Exam }
@@ -31,6 +60,80 @@ export type Action =
 
 export function reduceData(state: AppData, action: Action): AppData {
   switch (action.type) {
+    case 'maze/save': {
+      const old = state.mazes.find((m) => m.id === action.maze.id);
+      if (action.maze.authorId !== state.profile.id || (old && old.authorId !== state.profile.id))
+        throw new Error('You can only edit your own games.');
+      return {
+        ...state,
+        mazes: [...state.mazes.filter((m) => m.id !== action.maze.id), action.maze],
+      };
+    }
+    case 'maze/delete':
+      if (!state.mazes.some((m) => m.id === action.id && m.authorId === state.profile.id))
+        throw new Error('You can only delete your own games.');
+      return { ...state, mazes: state.mazes.filter((m) => m.id !== action.id) };
+    case 'quiz/delete':
+      if (
+        !state.quizzes.some(
+          (q) => q.id === action.id && (q.authorId ?? state.profile.id) === state.profile.id,
+        )
+      )
+        throw new Error('You can only delete your own quizzes.');
+      return {
+        ...state,
+        quizzes: state.quizzes.filter((q) => q.id !== action.id),
+        quizResults: Object.fromEntries(
+          Object.entries(state.quizResults).filter(([id]) => id !== action.id),
+        ),
+      };
+
+    case 'content/edit': {
+      const c = [...state.posts, ...state.reels].find((c) => c.id === action.id);
+      if (!c || c.authorId !== state.profile.id)
+        throw new Error('You can only edit your own content.');
+      return {
+        ...state,
+        posts: state.posts.map((p) => (p.id === action.id ? { ...p, ...action.changes } : p)),
+        reels: state.reels.map((p) => (p.id === action.id ? { ...p, ...action.changes } : p)),
+      };
+    }
+    case 'comment/edit':
+      if (!state.comments.some((c) => c.id === action.id && c.authorId === state.profile.id))
+        throw new Error('You can only edit your own comments.');
+      return {
+        ...state,
+        comments: state.comments.map((c) => (c.id === action.id ? { ...c, text: action.text } : c)),
+      };
+    case 'pod/edit':
+      if (
+        !state.pods.some(
+          (p) => p.id === action.pod.id && (p.authorId ?? state.profile.id) === state.profile.id,
+        )
+      )
+        throw new Error('You can only edit your own pods.');
+      return {
+        ...state,
+        pods: state.pods.map((p) =>
+          p.id === action.pod.id ? { ...action.pod, authorId: p.authorId } : p,
+        ),
+      };
+    case 'quiz/edit':
+      if (
+        !state.quizzes.some(
+          (q) => q.id === action.quiz.id && (q.authorId ?? state.profile.id) === state.profile.id,
+        )
+      )
+        throw new Error('You can only edit your own quizzes.');
+      return {
+        ...state,
+        quizzes: state.quizzes.map((q) =>
+          q.id === action.quiz.id ? { ...action.quiz, authorId: q.authorId } : q,
+        ),
+        quizResults: Object.fromEntries(
+          Object.entries(state.quizResults).filter(([id]) => id !== action.quiz.id),
+        ),
+      };
     case 'notebook/save':
       return {
         ...state,
@@ -73,7 +176,12 @@ export function reduceData(state: AppData, action: Action): AppData {
       if (!state.comments.some((c) => c.id === action.id && c.authorId === state.profile.id))
         throw new Error('You can only delete your own discussion.');
 
-      return { ...state, comments: state.comments.filter((c) => c.id !== action.id) };
+      return {
+        ...state,
+        comments: state.comments
+          .filter((c) => c.id !== action.id)
+          .map((c) => (c.parentId === action.id ? { ...c, parentId: undefined } : c)),
+      };
 
     case 'pod/delete':
       if (
@@ -189,6 +297,13 @@ export function reduceData(state: AppData, action: Action): AppData {
         ),
       };
     case 'comment/add':
+      if (
+        action.comment.parentId &&
+        !state.comments.some(
+          (c) => c.id === action.comment.parentId && c.contentId === action.comment.contentId,
+        )
+      )
+        throw new Error('The comment you replied to is no longer available.');
       return { ...state, comments: [...state.comments, action.comment] };
 
     case 'profile/update':
@@ -201,6 +316,11 @@ export function reduceData(state: AppData, action: Action): AppData {
       return {
         ...state,
 
+        followEdges: state.following.includes(action.id)
+          ? state.followEdges.filter(
+              (edge) => !(edge.userId === state.profile.id && edge.targetId === action.id),
+            )
+          : [...state.followEdges, { userId: state.profile.id, targetId: action.id }],
         following: state.following.includes(action.id)
           ? state.following.filter((id) => id !== action.id)
           : [...state.following, action.id],

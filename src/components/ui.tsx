@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useT } from '../lib/i18n';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { X, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { displayName, initials, topicColor } from '../lib/utils';
@@ -79,9 +79,11 @@ export function Modal({
   children,
   onClose,
   className,
+  style,
 }: {
   title: string;
   className?: string;
+  style?: CSSProperties;
   children: ReactNode;
   onClose: () => void;
 }) {
@@ -96,6 +98,7 @@ export function Modal({
     <dialog
       ref={ref}
       className={className}
+      style={style}
       aria-label={t(title)}
       onCancel={(event) => {
         event.preventDefault();

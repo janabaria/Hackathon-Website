@@ -1,3 +1,5 @@
+import { MazeGamePage } from '../pages/MazeGame';
+import { AboutPage } from '../pages/AboutPage';
 import { AdminPage } from '../pages/AdminPage';
 import { T } from '../lib/i18n';
 import { LearningGamePage } from '../pages/LearningGamePage';
@@ -23,7 +25,7 @@ import { useApp } from '../state/AppProvider';
 export function App() {
   const [composing, setComposing] = useState(false);
   const location = useLocation();
-  const { cloud, checking, userId, loading, pending, refresh, signOut, recoveryError } = useApp();
+  const { cloud, checking, userId, loading, pending, recoveryError } = useApp();
   if (cloud && checking)
     return (
       <main className="main-content">
@@ -40,26 +42,9 @@ export function App() {
     );
   return (
     <Layout onCreate={() => setComposing(true)}>
-      {cloud && (
-        <div className="button-row account-session-bar">
-          <span>
-            <T>Connected to your account</T>
-          </span>
-          <button
-            className="button secondary"
-            disabled={loading || pending}
-            onClick={() => void refresh()}
-          >
-            <T>Refresh</T>
-          </button>
-          <button className="text-button" disabled={pending} onClick={() => void signOut()}>
-            <T>Sign out</T>
-          </button>
-        </div>
-      )}
       {cloud && recoveryError ? (
         <p role="alert">
-          Install the new database migration, then click Refresh. Your existing posts are safe.
+          Install the new database migration, then reload the page. Your existing posts are safe.
         </p>
       ) : loading && cloud ? (
         <p role="status">
@@ -79,8 +64,10 @@ export function App() {
                 <Route path="/" element={<HomePage onCreate={() => setComposing(true)} />} />
                 <Route path="/notebooks" element={<NotebooksPage />} />
                 <Route path="/notebooks/:id" element={<NotebookPage />} />
+                <Route path="/about" element={<AboutPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/reels" element={<ReelsPage />} />
+                <Route path="/maze/:id" element={<MazeGamePage />} />
                 <Route path="/interact" element={<InteractPage />} />
                 <Route path="/game/:id" element={<LearningGamePage />} />
                 <Route path="/quiz/:id" element={<QuizPage />} />

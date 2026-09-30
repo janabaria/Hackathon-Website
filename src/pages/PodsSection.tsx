@@ -1,11 +1,12 @@
+import { EditPodButton } from '../components/EditContent';
 import { T } from '../lib/i18n';
 import { Avatar } from '../components/ui';
 
 import { DeleteButton } from '../components/DeleteButton';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { ArrowUpRight, Plus, Timer } from 'lucide-react';
 
@@ -19,6 +20,15 @@ import type { Pod } from '../domain/schema';
 
 export function PodsSection({ initialGoal }: { initialGoal: string }) {
   const { data, commit, notify } = useApp();
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('create') === '1') {
+      setOpen(true);
+      const next = new URLSearchParams(params);
+      next.delete('create');
+      setParams(next, { replace: true });
+    }
+  }, [params, setParams]);
 
   const [open, setOpen] = useState(Boolean(initialGoal));
 
@@ -70,7 +80,10 @@ export function PodsSection({ initialGoal }: { initialGoal: string }) {
 
                 <p>{pod.goal}</p>
 
-                <small>{pod.minutes} minute session · Personal workspace</small>
+                <small>
+                  {pod.minutes} minute session ·{' '}
+                  {pod.visibility === 'public' ? 'Public pod' : 'Private pod'}
+                </small>
 
                 {joined ? (
                   <Link className="button primary" to={`/focus/${pod.id}`}>
@@ -95,6 +108,7 @@ export function PodsSection({ initialGoal }: { initialGoal: string }) {
 
                 {own && (
                   <>
+                    <EditPodButton pod={pod} />
                     <DeleteButton label="pod" action={{ type: 'pod/delete', id: pod.id }} />
                     {data.podRequests
                       .filter((r) => r.podId === pod.id && r.status === 'pending')

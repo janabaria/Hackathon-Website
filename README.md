@@ -110,3 +110,19 @@ Redeploy `generate-learning` and `review-post` after the migration so errors dis
 Migration 009 adds validated optional thumbnails for post videos and reels. New video forms accept PNG/JPG/WebP/GIF covers up to 1 MB with preview and removal. Covers appear before playback and in reel profile/search cards. Existing videos remain valid without a custom cover. Profile is restored alongside Notebooks in both desktop navigation and the six-item mobile bar; mobile administration remains accessible from Settings.
 
 Live deployment on September 29: migrations 007–009 installed; the verified owner account was activated after explicit confirmation. Both AI Edge Functions were redeployed. The owner dashboard showed unlimited app allowance, thumbnail file preview was checked, and mobile Profile navigation was verified at 390px width. Build, 28 app tests, and 5 database tests passed. No other user was restricted and no content was hidden during live verification.
+
+## Immersive reels update
+
+Reels now use a viewport-height scroll-snap player, tap-to-pause/play, a separate heart counter, thumbnail browsing, and a bottom comment sheet with per-comment likes. Profile and search reel cards share the thumbnail component; existing videos use a first-frame preview when no cover was uploaded. Study this remains available separately. Navigation retains the existing design with clearer spacing and active states.
+
+Apply supabase/010_reel_comments.sql after 009 for persistent comment reactions. Comment reactions are restricted to signed-in users and visible comments. The latest validation passed 37 app tests, 5 database tests, and the production build.
+
+## September 30 workspace update
+
+Notebook pages now use an inline rich-text editor: bold, italic, bullets, numbered lists, text color and highlights are visible while writing. HTML is sanitized to formatting-only tags and colors; a plain-text copy remains available for AI quiz creation. Legacy plain/Markdown notes still open, and formatting is stored in each private page. Notebook and section names can be edited.
+
+Calendar and About Us sit beside Settings in the header. The sidebar footer and account refresh bar are removed; Sign out is available only on the owner's profile. Create opens an animated post/reel/pod chooser. Reels receive a random order for each visit, stable during likes and edits. Home posts are sorted newest first.
+
+Owner edit controls cover post captions/topics, reel titles/captions/topics/covers, comments, pods, and quizzes. Profile, exam, notebook, section and page editing remain available. Run `011_owner_editing.sql` after 010 to enable restricted column updates; ownership and existing account restrictions remain enforced. Quiz question edits invalidate previous stored results.
+
+`012_starter_posts.sql` is an optional, explicitly requested content seed. It adds five topic-varied posts per existing profile, has deterministic IDs to prevent duplicates on rerun, and leaves existing content intact. It was run on the connected project on September 30, creating 75 posts for 15 profiles. Migration 011 was also installed. No sample accounts or authentication credentials were created.

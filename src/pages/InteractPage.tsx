@@ -1,3 +1,7 @@
+import { MazeEditor } from './MazeGame';
+import { starterMazes } from '../domain/maze';
+import type { Maze } from '../domain/schema';
+import { DeleteButton } from '../components/DeleteButton';
 import { T } from '../lib/i18n';
 import type { Quiz } from '../domain/schema';
 import { useState } from 'react';
@@ -11,6 +15,8 @@ export function InteractPage() {
   const { data } = useApp();
   const [params] = useSearchParams();
   const notebook = data.notebooks.find((n) => n.id === params.get('notebook'));
+  const [mazeEditor, setMazeEditor] = useState<Maze | 'new' | null>(null);
+  const [editing, setEditing] = useState<Quiz | null>(null);
   const [remix, setRemix] = useState<Quiz | null>(null);
   const [open, setOpen] = useState<'manual' | 'ai' | null>(null);
   const notes = notebook
@@ -70,6 +76,44 @@ export function InteractPage() {
           </span>
         </button>
       </div>
+      <section className="game-lab">
+        <div className="section-heading">
+          <div>
+            <h2>Robot lab</h2>
+            <p>
+              Real puzzles, no multiple-choice questions. Build an algorithm, run it, and debug the
+              route.
+            </p>
+          </div>
+          <button className="button primary" onClick={() => setMazeEditor('new')}>
+            Build a maze
+          </button>
+        </div>
+        <div className="card-grid">
+          {[...starterMazes, ...data.mazes].map((m) => (
+            <article className="card quiz-card" key={m.id}>
+              <Gamepad2 />
+              <h3>{m.title}</h3>
+              <p>
+                {m.stars.length} {m.stars.length === 1 ? 'star' : 'stars'} · 5 × 5 maze · Algorithm
+                puzzle
+              </p>
+              <Link className="button primary" to={`/maze/${m.id}`}>
+                Play maze
+              </Link>
+              {m.authorId === data.profile.id && (
+                <div className="button-row">
+                  <button className="text-button" onClick={() => setMazeEditor(m)}>
+                    Edit game
+                  </button>
+                  <DeleteButton label="game" action={{ type: 'maze/delete', id: m.id }} />
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+      <h2>Community quizzes & practice</h2>
       <div className="card-grid">
         {data.quizzes.map((q) => (
           <article className="card quiz-card" key={q.id}>
@@ -78,6 +122,14 @@ export function InteractPage() {
               <Topic topic={q.topic} />
             </div>
             <h2>{q.title}</h2>
+            {(q.authorId ?? data.profile.id) === data.profile.id && (
+              <div className="button-row">
+                <button className="text-button" onClick={() => setEditing(q)}>
+                  Edit quiz
+                </button>
+                <DeleteButton label="quiz" action={{ type: 'quiz/delete', id: q.id }} />
+              </div>
+            )}
             <p className="muted">
               {q.difficulty} · {q.questions.length} questions
             </p>
@@ -124,6 +176,13 @@ export function InteractPage() {
           description="Create a quiz above. You can play it as a classic quiz, matching blocks, or flashcards."
         />
       )}
+      {mazeEditor && (
+        <MazeEditor
+          initial={mazeEditor === 'new' ? undefined : mazeEditor}
+          onClose={() => setMazeEditor(null)}
+        />
+      )}
+      {editing && <QuizEditor initial={editing} editing onClose={() => setEditing(null)} />}
       {open === 'manual' && (
         <QuizEditor subject={notebook?.subject} onClose={() => setOpen(null)} />
       )}

@@ -108,10 +108,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPending(true);
       generation.current++;
       let saved = false;
+      const previous = dataRef.current;
+      const optimistic = ['content/toggle', 'comment/like', 'account/follow'].includes(action.type);
       try {
         const next = dataSchema.parse(reduceData(dataRef.current, action));
         if (supabase && id) {
-          await writeAccount(id, dataRef.current, action);
+          if (optimistic) {
+            dataRef.current = next;
+            setData(next);
+          }
+          await writeAccount(id, previous, action);
           saved = true;
           if (identity.current !== id) return false;
           dataRef.current = next;
@@ -135,6 +141,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRecoveryError(null);
         return true;
       } catch (err) {
+        if (optimistic && !saved && identity.current === id) {
+          dataRef.current = previous;
+          setData(previous);
+        }
         setNotice(
           'Not saved: ' +
             (err instanceof Error

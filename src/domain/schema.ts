@@ -6,6 +6,7 @@ const imageSource = z
   .refine(
     (value) =>
       value === '' ||
+      /^\/learning-assets\/[a-z0-9-]+\.svg$/.test(value) ||
       /^https?:\/\//i.test(value) ||
       /^data:image\/(png|jpeg|webp|gif);base64,/i.test(value),
     'Use an HTTP image URL or an uploaded PNG, JPEG, WebP, or GIF.',
@@ -47,6 +48,7 @@ export const reelSchema = z.object({
     .refine((value) => /^https?:\/\//i.test(value), 'Use an HTTP(S) video URL.'),
 });
 export const commentSchema = z.object({
+  parentId: id.optional(),
   createdAt: z.string().datetime().optional(),
   liked: z.boolean().optional(),
   likeCount: z.number().int().nonnegative().optional(),
@@ -79,6 +81,26 @@ export const quizSchema = z.object({
   difficulty: z.enum(['Beginner', 'Intermediate', 'Advanced']),
   questions: z.array(questionSchema).min(1).max(20),
 });
+export const mazeSchema = z
+  .object({
+    id,
+    authorId: id,
+    title: shortText,
+    start: z.number().int().min(0).max(24),
+    goal: z.number().int().min(0).max(24),
+    walls: z.array(z.number().int().min(0).max(24)).max(23),
+    stars: z.array(z.number().int().min(0).max(24)).max(8),
+  })
+  .refine(
+    (m) =>
+      new Set([...m.walls, ...m.stars]).size === m.walls.length + m.stars.length &&
+      m.start !== m.goal &&
+      !m.walls.includes(m.start) &&
+      !m.walls.includes(m.goal) &&
+      m.stars.every((s) => !m.walls.includes(s) && s !== m.start && s !== m.goal),
+    'Start, goal, stars and walls must not overlap.',
+  );
+export type Maze = z.infer<typeof mazeSchema>;
 export const podSchema = z.object({
   id,
   authorId: id.optional(),
@@ -106,6 +128,7 @@ export const notebookSchema = z.object({
               id,
               title: shortText,
               notes: z.string().max(12000),
+              html: z.string().max(60000).optional(),
               contentIds: z.array(id).max(100),
             }),
           )
@@ -137,6 +160,7 @@ export const dataSchema = z
     posts: z.array(postSchema),
     reels: z.array(reelSchema),
     quizzes: z.array(quizSchema),
+    mazes: z.array(mazeSchema).default([]),
     pods: z.array(podSchema),
     podRequests: z.array(podRequestSchema).default([]),
     notebooks: z.array(notebookSchema).default([]),
@@ -144,6 +168,7 @@ export const dataSchema = z
     dismissedReminders: z.array(id).default([]),
     comments: z.array(commentSchema),
     following: z.array(id),
+    followEdges: z.array(z.object({ userId: id, targetId: id })).default([]),
     completedSessions: z.array(id),
     quizResults: z.record(
       z.string(),
@@ -209,6 +234,7 @@ export function createEmptyData(): AppData {
     posts: [],
     reels: [],
     quizzes: [],
+    mazes: [],
     pods: [],
     podRequests: [],
     notebooks: [],
@@ -216,6 +242,7 @@ export function createEmptyData(): AppData {
     dismissedReminders: [],
     comments: [],
     following: [],
+    followEdges: [],
     completedSessions: [],
     quizResults: {},
     draft: '',

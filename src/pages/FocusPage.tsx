@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { Link, useParams } from 'react-router-dom';
 
-import { ArrowLeft, Pause, Play, RotateCcw, Timer } from 'lucide-react';
+import { Pause, Play, RotateCcw, Timer } from 'lucide-react';
 
 import { useApp } from '../state/AppProvider';
 
@@ -71,14 +71,11 @@ function FocusRoom({ pod }: { pod: Pod }) {
   }, [timer.complete, recorded, commit, sessionId, notify]);
 
   return (
-    <>
-      <SharedPod pod={pod} />
+    <div className="pod-session-layout">
+      <div className="pod-session-main">
+        <SharedPod pod={pod} />
+      </div>
       <section className="focus-room">
-        <Link to="/?tab=pods" className="back-link">
-          <ArrowLeft size={17} />
-          <T>Leave session</T>
-        </Link>
-
         <div className="focus-room-content">
           <span className="eyebrow">{pod.vibe}</span>
 
@@ -142,6 +139,6 @@ function FocusRoom({ pod }: { pod: Pod }) {
           </small>
         </div>
       </section>
-    </>
+    </div>
   );
 }

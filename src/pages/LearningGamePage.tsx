@@ -31,7 +31,11 @@ export function LearningGamePage() {
 }
 function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; themed: boolean }) {
   const { commit } = useApp();
-  const [round, setRound] = useState(0);
+
+  const [started, setStarted] = useState(false);
+  const [reviewQueue, setReviewQueue] = useState(() => quiz.questions.map((_, i) => i));
+  const [reviewed, setReviewed] = useState(0);
+  const [answerMatches, setAnswerMatches] = useState<number[]>([]);
   const [flipped, setFlipped] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [matched, setMatched] = useState<number[]>([]);
@@ -39,9 +43,9 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
   const [message, setMessage] = useState('');
   const [saved, setSaved] = useState(false);
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [order] = useState(() => shuffled(quiz.questions.map((_, i) => i)));
+  const [order, setOrder] = useState(() => shuffled(quiz.questions.map((_, i) => i)));
   const complete =
-    mode === 'cards' ? round >= quiz.questions.length : matched.length === quiz.questions.length;
+    mode === 'cards' ? reviewQueue.length === 0 : matched.length === quiz.questions.length;
   return (
     <>
       <Link className="back-link" to="/interact">
@@ -58,7 +62,23 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
               : 'Try recalling the answer, then flip the card to check.'
         }
       />
-      {complete ? (
+      {!started ? (
+        <section className="card score-screen">
+          <Gamepad2 size={40} />
+          <h2>{mode === 'blocks' ? 'Connect the ideas' : 'Practice until it sticks'}</h2>
+          <p>
+            {quiz.questions.length} questions · {quiz.difficulty}
+          </p>
+          <p>
+            {mode === 'blocks'
+              ? 'Choose a question and its matching answer. Mistakes stay visible in your first-try score; keep trying until every pair is cleared.'
+              : 'Recall each answer, reveal it, then choose Got it or Practice again. Cards you find difficult return later in the round.'}
+          </p>
+          <button className="button primary" onClick={() => setStarted(true)}>
+            Start game
+          </button>
+        </section>
+      ) : complete ? (
         <section className="card score-screen">
           <h2>
             <T>That's another step forward!</T>
@@ -66,8 +86,15 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
           <p>
             {mode === 'blocks'
               ? `${quiz.questions.length} matches in ${attempts} attempts.`
-              : 'You reviewed every card.'}
+              : `You recalled all ${quiz.questions.length} cards in ${reviewed} reviews.`}
           </p>
+          {mode === 'blocks' && (
+            <p>
+              First-try score:{' '}
+              {quiz.questions.filter((q, i) => answers[i] === q.correctIndex).length} /{' '}
+              {quiz.questions.length}
+            </p>
+          )}
           {mode === 'blocks' && !saved && (
             <button
               className="button primary"
@@ -94,7 +121,11 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
             <button
               className="button secondary"
               onClick={() => {
-                setRound(0);
+                setReviewQueue(quiz.questions.map((_, i) => i));
+                setReviewed(0);
+                setAnswerMatches([]);
+                setOrder(shuffled(quiz.questions.map((_, i) => i)));
+                setStarted(false);
                 setMatched([]);
                 setAttempts(0);
                 setAnswers({});
@@ -113,8 +144,14 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
         </section>
       ) : mode === 'cards' ? (
         <section className="card flashcard-player">
+          <progress
+            aria-label="Cards mastered"
+            max={quiz.questions.length}
+            value={quiz.questions.length - reviewQueue.length}
+          />
           <p>
-            Card {round + 1} / {quiz.questions.length}
+            {quiz.questions.length - reviewQueue.length} / {quiz.questions.length} mastered ·{' '}
+            {reviewQueue.length} remaining
           </p>
           <button
             className={`flashcard ${flipped ? 'flipped' : ''}`}
@@ -124,10 +161,12 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
             <span>{flipped ? 'ANSWER' : 'QUESTION'}</span>
             <h2>
               {flipped
-                ? quiz.questions[round].options[quiz.questions[round].correctIndex]
-                : quiz.questions[round].prompt}
+                ? quiz.questions[reviewQueue[0]].options[
+                    quiz.questions[reviewQueue[0]].correctIndex
+                  ]
+                : quiz.questions[reviewQueue[0]].prompt}
             </h2>
-            {flipped && <p>{quiz.questions[round].explanation}</p>}
+            {flipped && <p>{quiz.questions[reviewQueue[0]].explanation}</p>}
             <small>
               <T>Tap to flip</T>
             </small>
@@ -135,27 +174,31 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
           <div className="button-row">
             <button
               className="button secondary"
-              disabled={round === 0}
+              disabled={!flipped}
               onClick={() => {
-                setRound((r) => r - 1);
+                setReviewQueue((q) => [...q.slice(1), q[0]]);
+                setReviewed((n) => n + 1);
                 setFlipped(false);
               }}
             >
-              <T>Previous</T>
+              Practice again
             </button>
             <button
               className="button primary"
+              disabled={!flipped}
               onClick={() => {
-                setRound((r) => r + 1);
+                setReviewQueue((q) => q.slice(1));
+                setReviewed((n) => n + 1);
                 setFlipped(false);
               }}
             >
-              {round === quiz.questions.length - 1 ? 'Finish review' : 'Next card'}
+              Got it
             </button>
           </div>
         </section>
       ) : (
         <section className="card block-game-panel">
+          <progress aria-label="Pairs matched" max={quiz.questions.length} value={matched.length} />
           <p>
             {matched.length} / {quiz.questions.length} cleared · {attempts} attempts
           </p>
@@ -180,8 +223,8 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
             <div>
               {order.map((i) => (
                 <button
-                  className={`match-block answer-block ${matched.includes(i) ? 'matched' : ''}`}
-                  disabled={matched.includes(i) || selected === null}
+                  className={`match-block answer-block ${answerMatches.includes(i) ? 'matched' : ''}`}
+                  disabled={answerMatches.includes(i) || selected === null}
                   key={quiz.questions[i].id}
                   onClick={() => {
                     if (selected === null) return;
@@ -201,6 +244,7 @@ function Game({ quiz, mode, themed }: { quiz: Quiz; mode: 'cards' | 'blocks'; th
                     );
                     if (correct) {
                       setMatched((m) => [...m, selected]);
+                      setAnswerMatches((m) => [...m, i]);
                       setSelected(null);
                       setMessage('Great connection! Keep going.');
                     } else setMessage('Not quite. Try another answer.');

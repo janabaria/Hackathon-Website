@@ -1,3 +1,6 @@
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
+import { PodRequests } from './PodRequests';
 import { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Users } from 'lucide-react';
 import type { Pod } from '../domain/schema';
@@ -45,7 +48,8 @@ function LiveVideo({
   );
 }
 export function SharedPod({ pod }: { pod: Pod }) {
-  const { data, cloud } = useApp();
+  const { data, cloud, notify } = useApp();
+  const navigate = useNavigate();
   const owner = (pod.authorId ?? data.profile.id) === data.profile.id;
   const {
     connectionId,
@@ -76,7 +80,16 @@ export function SharedPod({ pod }: { pod: Pod }) {
       setWorking(false);
     }
   };
-  if (!cloud) return <div className="card shared-pod">Sign in to join live study rooms.</div>;
+  if (!cloud)
+    return (
+      <div className="card shared-pod">
+        <Link className="button secondary" to="/?tab=pods">
+          Leave session
+        </Link>
+        <p>Sign in to join live study rooms.</p>
+        <PodRequests pod={pod} />
+      </div>
+    );
   return (
     <section className="card shared-pod">
       <div className="section-heading">
@@ -142,7 +155,37 @@ export function SharedPod({ pod }: { pod: Pod }) {
             </button>
           </>
         )}
+        <button
+          className="button secondary session-exit"
+          disabled={working}
+          onClick={() =>
+            void act(async () => {
+              call.leave();
+              if (connectionId) {
+                const result = await supabase!.from('pod_presence').delete().eq('id', connectionId);
+                if (result.error) {
+                  notify('Could not disconnect the room. Please try leaving again.');
+                  return;
+                }
+              }
+              navigate('/?tab=pods');
+            })
+          }
+        >
+          Leave session
+        </button>
       </div>
+      {call.busy && (
+        <div className="button-row" role="status">
+          <span>
+            Waiting for camera or microphone access. Check your browser permission prompt.
+          </span>
+          <button className="button secondary" onClick={call.leave}>
+            Cancel request
+          </button>
+        </div>
+      )}
+      <PodRequests pod={pod} />
       {call.error && <p role="alert">{call.error}</p>}
       <div className="pod-video-grid">
         {call.stream && <LiveVideo stream={call.stream} muted name="You" />}

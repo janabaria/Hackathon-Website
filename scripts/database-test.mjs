@@ -281,6 +281,7 @@ test('admin controls enforce owner access, adjustable quotas, reversible moderat
       '007_admin_controls.sql',
       '009_video_thumbnails.sql',
       '010_reel_comments.sql',
+      '011_owner_editing.sql',
     ])
       await db.exec(await readFile(new URL('../supabase/' + file, import.meta.url), 'utf8'));
     const owner = '11111111-1111-4111-8111-111111111111',
@@ -324,6 +325,34 @@ test('admin controls enforce owner access, adjustable quotas, reversible moderat
     );
     assert.equal((await db.query(`select * from public.comment_likes`)).rows.length, 0);
 
+    await db.exec(
+      `update public.posts set caption='Edited learning' where id='${post}'; update public.comments set text='Edited comment' where id='${commentId}'; update public.pods set title='Edited pod' where id='${pod}';`,
+    );
+    assert.equal(
+      (await db.query(`select caption from public.posts where id='${post}'`)).rows[0].caption,
+      'Edited learning',
+    );
+    await assert.rejects(
+      db.exec(`update public.posts set author_id='${owner}' where id='${post}'`),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.exec(`update public.posts set moderated=true where id='${post}'`),
+      /permission denied/,
+    );
+    await asUser(owner);
+    await db.exec(
+      `update public.posts set caption='Forged edit' where id='${post}'; update public.comments set text='Forged edit' where id='${commentId}';`,
+    );
+    assert.equal(
+      (await db.query(`select caption from public.posts where id='${post}'`)).rows[0].caption,
+      'Edited learning',
+    );
+    assert.equal(
+      (await db.query(`select text from public.comments where id='${commentId}'`)).rows[0].text,
+      'Edited comment',
+    );
+    await asUser(member);
     await assert.rejects(db.query('select public.admin_dashboard()'), /Admin access/);
     await assert.rejects(
       db.exec(
@@ -393,8 +422,97 @@ test('admin controls enforce owner access, adjustable quotas, reversible moderat
     assert.ok(end.audit.length >= 9);
     assert.ok(end.audit.every((a) => a.reason && a.actor_id === owner));
     await assert.rejects(db.exec('delete from public.admin_audit'), /permission denied/);
+    await db.exec('reset role');
+    const seed = await readFile(
+      new URL('../supabase/012_starter_posts.sql', import.meta.url),
+      'utf8',
+    );
+    await db.exec(seed);
+    await db.exec(seed);
+    assert.equal((await db.query('select count(*)::int as n from public.posts')).rows[0].n, 11);
     await db.exec('reset role;set role anon');
     await assert.rejects(db.query('select public.admin_dashboard()'), /permission denied/);
+  } finally {
+    await db.close();
+  }
+});
+
+test('comment replies stay on the same content and survive parent deletion', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create schema auth;
+      create table auth.users(id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;`);
+    await db.exec(await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8'));
+    await db.exec(
+      await readFile(new URL('../supabase/002_connected_app.sql', import.meta.url), 'utf8'),
+    );
+    await db.exec(
+      await readFile(new URL('../supabase/013_comment_replies.sql', import.meta.url), 'utf8'),
+    );
+    await db.exec(`insert into auth.users values('11111111-1111-4111-8111-111111111111');
+      insert into profiles(id,name) values('11111111-1111-4111-8111-111111111111','Learner');
+      insert into posts(id,author_id,caption,topic) values
+      ('22222222-2222-4222-8222-222222222222','11111111-1111-4111-8111-111111111111','One','Study'),
+      ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Two','Study');
+      insert into comments(id,content_id,author_id,text) values
+      ('44444444-4444-4444-8444-444444444444','22222222-2222-4222-8222-222222222222','11111111-1111-4111-8111-111111111111','Question');`);
+    await assert.rejects(
+      db.exec(
+        `insert into comments(id,content_id,author_id,text,parent_id) values(gen_random_uuid(),'33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Wrong thread','44444444-4444-4444-8444-444444444444');`,
+      ),
+      /same content/,
+    );
+    await db.exec(`insert into comments(id,content_id,author_id,text,parent_id) values(gen_random_uuid(),'22222222-2222-4222-8222-222222222222','11111111-1111-4111-8111-111111111111','Answer','44444444-4444-4444-8444-444444444444');
+      delete from comments where id='44444444-4444-4444-8444-444444444444';`);
+    const { rows } = await db.query('select text,parent_id from comments');
+    assert.deepEqual(rows, [{ text: 'Answer', parent_id: null }]);
+  } finally {
+    await db.close();
+  }
+});
+
+test('maze publishing and quiz deletion enforce author ownership', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(
+      `create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;`,
+    );
+    for (const file of ['schema.sql', '002_connected_app.sql', '016_learning_games.sql'])
+      await db.exec(await readFile(new URL('../supabase/' + file, import.meta.url), 'utf8'));
+    const a = '11111111-1111-4111-8111-111111111111',
+      b = '22222222-2222-4222-8222-222222222222',
+      g = '33333333-3333-4333-8333-333333333333';
+    await db.exec(
+      `insert into auth.users values('${a}'),('${b}');insert into profiles(id,name) values('${a}','A'),('${b}','B');select set_config('request.jwt.claim.sub','${a}',false);set role authenticated;insert into learning_games values('${g}','${a}','A maze','{"start":10,"goal":14,"walls":[],"stars":[12]}');`,
+    );
+    await assert.rejects(
+      db.exec(`update learning_games set level='{"start":10,"goal":14,"walls":[12],"stars":[12]}'`),
+      /valid_maze_shape/,
+    );
+    await db.exec(
+      `reset role;select set_config('request.jwt.claim.sub','${b}',false);set role authenticated;delete from learning_games where id='${g}';update learning_games set title='forged' where id='${g}';`,
+    );
+    assert.equal((await db.query('select title from learning_games')).rows[0].title, 'A maze');
+    await assert.rejects(
+      db.exec(
+        `insert into learning_games values(gen_random_uuid(),'${a}','forged','{"start":0,"goal":24,"walls":[],"stars":[]}')`,
+      ),
+      /row-level security/,
+    );
+    await db.exec(
+      `reset role;select set_config('request.jwt.claim.sub','${a}',false);set role authenticated;delete from learning_games where id='${g}';`,
+    );
+    assert.equal((await db.query('select * from learning_games')).rows.length, 0);
+    const q = '44444444-4444-4444-8444-444444444444';
+    await db.exec(
+      `insert into quizzes values('${q}','${a}','Owned quiz','Math','Beginner','[{"id":"q1","prompt":"Choose","options":["a","b","c","d"],"correctIndex":1,"explanation":""}]');reset role;select set_config('request.jwt.claim.sub','${b}',false);set role authenticated;delete from quizzes where id='${q}';`,
+    );
+    assert.equal((await db.query(`select id from quizzes where id='${q}'`)).rows.length, 1);
+    await db.exec(
+      `reset role;select set_config('request.jwt.claim.sub','${a}',false);set role authenticated;delete from quizzes where id='${q}';`,
+    );
+    assert.equal((await db.query(`select id from quizzes where id='${q}'`)).rows.length, 0);
   } finally {
     await db.close();
   }

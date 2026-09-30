@@ -41,3 +41,14 @@ it('preserves a valid profile photo and rejects unsafe image sources', () => {
   expect(profileSchema.parse(person).avatar).toBe(person.avatar);
   expect(profileSchema.safeParse({ ...person, avatar: 'javascript:alert(1)' }).success).toBe(false);
 });
+
+it('preserves rich formatting while keeping plain notes for AI and search', () => {
+  const page = {
+    ...sectionPages(oldBook.sections[0])[0],
+    notes: 'A colorful note',
+    html: '<div><span style="color:#ff0000">A colorful note</span></div>',
+  };
+  const book = { ...oldBook, sections: [withPages(oldBook.sections[0], [page])] };
+  expect(notebookSchema.parse(book).sections[0].pages?.[0].html).toBe(page.html);
+  expect(book.sections[0].notes).toBe('A colorful note');
+});

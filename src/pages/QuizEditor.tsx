@@ -27,9 +27,11 @@ export function QuizEditor({
   onClose,
   initial,
   subject = '',
+  editing = false,
 }: {
   onClose: () => void;
   initial?: Quiz;
+  editing?: boolean;
   subject?: string;
 }) {
   const { data, commit, notify } = useApp();
@@ -43,7 +45,7 @@ export function QuizEditor({
   );
 
   const [questions, setQuestions] = useState<Quiz['questions']>(
-    initial?.questions ?? [blankQuestion()],
+    initial?.questions ?? Array.from({ length: 4 }, blankQuestion),
   );
 
   const [error, setError] = useState('');
@@ -54,13 +56,20 @@ export function QuizEditor({
     );
 
   return (
-    <Modal title={initial ? 'Review your AI draft' : 'Create a quiz'} onClose={onClose}>
+    <Modal
+      title={editing ? 'Edit quiz' : initial ? 'Review your AI draft' : 'Create a quiz'}
+      onClose={onClose}
+    >
       <form
         onSubmit={async (e) => {
           e.preventDefault();
 
+          if (questions.length < 4) {
+            setError('Add at least four different questions before publishing.');
+            return;
+          }
           const result = quizSchema.safeParse({
-            id: newId(),
+            id: editing && initial ? initial.id : newId(),
             authorId: data.profile.id,
             title,
             topic,
@@ -75,8 +84,8 @@ export function QuizEditor({
             return;
           }
 
-          if (await commit({ type: 'quiz/add', quiz: result.data })) {
-            notify('Quiz published for the community.');
+          if (await commit({ type: editing ? 'quiz/edit' : 'quiz/add', quiz: result.data })) {
+            notify(editing ? 'Quiz updated.' : 'Quiz published for the community.');
 
             onClose();
           }
@@ -131,6 +140,9 @@ export function QuizEditor({
           </label>
         </div>
 
+        <p className="muted">
+          {questions.length} questions · Publish 4–20 distinct questions with four answers each.
+        </p>
         {questions.map((q, index) => (
           <fieldset className="question-editor" key={q.id}>
             <legend>Question {index + 1}</legend>

@@ -69,3 +69,36 @@ describe('workspace integrity', () => {
     ).toBe(1);
   });
 });
+
+it('preserves reactions and rejects edits to another author', () => {
+  const state = createEmptyData();
+  const p = {
+    id: 'p',
+    authorId: state.profile.id,
+    caption: 'Before',
+    topic: 'Biology',
+    image: '',
+    createdAt: '2026-09-30T00:00:00Z',
+    liked: true,
+    saved: true,
+    shares: 2,
+    likeCount: 4,
+  };
+  state.posts = [p];
+  const next = reduceData(state, {
+    type: 'content/edit',
+    id: 'p',
+    changes: { caption: 'After', topic: 'Cooking' },
+  });
+  expect(next.posts[0]).toMatchObject({
+    caption: 'After',
+    liked: true,
+    likeCount: 4,
+    saved: true,
+    createdAt: p.createdAt,
+  });
+  state.posts = [{ ...p, authorId: 'someone-else' }];
+  expect(() =>
+    reduceData(state, { type: 'content/edit', id: 'p', changes: { caption: 'No', topic: 'No' } }),
+  ).toThrow('own content');
+});

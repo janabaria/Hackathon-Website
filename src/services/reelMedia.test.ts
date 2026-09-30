@@ -52,6 +52,19 @@ describe('reel file uploads', () => {
       uploadReelVideo(new File(['x'], 'x.mp4', { type: 'video/mp4' }), 'u'),
     ).rejects.toThrow('003_reel_uploads.sql');
   });
+  it('renews signed and public links only for the configured storage bucket', () => {
+    expect(
+      storedVideoPath(
+        'https://project.supabase.co/storage/v1/object/sign/reel-videos/u/a.mp4?token=expired',
+      ),
+    ).toBe('u/a.mp4');
+    expect(
+      storedVideoPath('https://project.supabase.co/storage/v1/object/public/reel-videos/u/a.mp4'),
+    ).toBe('u/a.mp4');
+    expect(
+      storedVideoPath('https://other.example/storage/v1/object/sign/reel-videos/u/a.mp4'),
+    ).toBeNull();
+  });
   it('keeps existing external video links working', async () => {
     expect(await playableVideoUrl('https://example.com/lesson.mp4')).toBe(
       'https://example.com/lesson.mp4',

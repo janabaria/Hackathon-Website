@@ -12,14 +12,17 @@ import {
   Plus,
   Search,
   Settings2,
-  Sparkles,
+  Info,
+  Users,
+  FileText,
   Video,
   UserRound,
 } from 'lucide-react';
 
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Modal } from './ui';
 
 import { useApp } from '../state/AppProvider';
 
@@ -40,6 +43,7 @@ const navigation = [
 
 export function Layout({ children, onCreate }: { children: ReactNode; onCreate: () => void }) {
   const t = useT();
+  const [creating, setCreating] = useState(false);
   const admin = useAdminAccess();
   const { data, notice, recoveryError } = useApp();
 
@@ -81,35 +85,10 @@ export function Layout({ children, onCreate }: { children: ReactNode; onCreate: 
           )}
         </nav>
 
-        <button className="button primary sidebar-create" onClick={onCreate}>
+        <button className="button primary sidebar-create" onClick={() => setCreating(true)}>
           <Plus size={18} />
-          <T>Create post</T>
+          <T>Create</T>
         </button>
-
-        <div className="sidebar-footer">
-          <div className="learning-note">
-            <Sparkles size={20} />
-
-            <strong>
-              <T>A space to grow.</T>
-            </strong>
-
-            <p>
-              <T>Discover. Focus. Practice.</T>
-              <br />
-              <T>Share what clicks.</T>
-            </p>
-          </div>
-
-          <Link className="settings-link" to="/calendar">
-            <CalendarDays size={18} />
-            <T>Exam calendar</T>
-          </Link>
-          <Link className="settings-link" to="/settings">
-            <Settings2 size={18} />
-            <T>Workspace settings</T>
-          </Link>
-        </div>
       </aside>
 
       <div className="main-shell">
@@ -135,6 +114,19 @@ export function Layout({ children, onCreate }: { children: ReactNode; onCreate: 
           </label>
 
           <div className="topbar-right">
+            <button
+              className="icon-button mobile-create"
+              aria-label="Create"
+              onClick={() => setCreating(true)}
+            >
+              <Plus size={20} />
+            </button>
+            <NavLink to="/calendar" className="icon-button" aria-label="Calendar" title="Calendar">
+              <CalendarDays size={20} />
+            </NavLink>
+            <NavLink to="/about" className="icon-button" aria-label="About us" title="About us">
+              <Info size={20} />
+            </NavLink>
             <Link to="/settings" className="icon-button topbar-settings" aria-label={t('Settings')}>
               <Settings2 size={20} />
             </Link>
@@ -158,6 +150,51 @@ export function Layout({ children, onCreate }: { children: ReactNode; onCreate: 
         </main>
       </div>
 
+      {creating && (
+        <Modal title="What will you create?" onClose={() => setCreating(false)}>
+          <p className="muted">One small idea can start something good.</p>
+          <div className="create-menu">
+            {[
+              {
+                title: 'Create post',
+                description: 'Share a discovery with your community.',
+                Icon: FileText,
+                action: () => onCreate(),
+              },
+              {
+                title: 'Create reel',
+                description: 'Teach something in a minute.',
+                Icon: Video,
+                action: () => navigate('/reels?create=1'),
+              },
+              {
+                title: 'Create pod',
+                description: 'Make space to learn together.',
+                Icon: Users,
+                action: () => navigate('/?tab=pods&create=1'),
+              },
+            ].map(({ title, description, Icon, action }, i) => (
+              <button
+                key={title}
+                style={{ animationDelay: `${i * 55}ms` }}
+                onClick={() => {
+                  setCreating(false);
+                  action();
+                }}
+              >
+                <span>
+                  <Icon size={24} />
+                </span>
+                <div>
+                  <strong>{title}</strong>
+                  <small>{description}</small>
+                </div>
+                <Plus size={18} />
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
       {notice && (
         <div className="toast" role="status">
           {notice}

@@ -29,6 +29,7 @@ export async function readAccount(userId: string): Promise<AppData> {
     pods,
     podRequests,
     commentLikes,
+    mazes,
   ] = await Promise.all([
     rows('profiles'),
     rows('posts'),
@@ -45,6 +46,7 @@ export async function readAccount(userId: string): Promise<AppData> {
     }),
     rows('pod_requests', 'pod_id'),
     rows('comment_likes', 'comment_id'),
+    rows('learning_games'),
   ]);
   const empty = createEmptyData();
   const profile = people.find((p) => p.id === userId) ?? { ...empty.profile, id: userId };
@@ -74,15 +76,18 @@ export async function readAccount(userId: string): Promise<AppData> {
     posts: mapped.filter((p) => p.kind === 'post'),
     reels: mapped.filter((p) => p.kind === 'reel'),
     quizzes: quizzes.map((q) => ({ ...q, game: q.game ?? undefined, authorId: q.author_id })),
+    mazes: mazes.map((m) => ({ ...m.level, id: m.id, authorId: m.author_id, title: m.title })),
     comments: comments.map((c) => ({
       id: c.id,
       contentId: c.content_id,
+      parentId: c.parent_id ?? undefined,
       authorId: c.author_id,
       text: c.text,
       createdAt: new Date(c.created_at).toISOString(),
       liked: commentLikes.some((l) => l.comment_id === c.id && l.user_id === userId),
       likeCount: commentLikes.filter((l) => l.comment_id === c.id).length,
     })),
+    followEdges: follows.map((f) => ({ userId: f.user_id, targetId: f.target_id })),
     following: follows.filter((f) => f.user_id === userId).map((f) => f.target_id),
     pods: pods.map((p) => ({ ...p, authorId: p.author_id })),
     podRequests: podRequests.map((r) => ({ podId: r.pod_id, userId: r.user_id, status: r.status })),
@@ -92,7 +97,11 @@ export async function readAccount(userId: string): Promise<AppData> {
     completedSessions: privateItems.filter((p) => p.kind === 'session').map((p) => p.id),
     quizResults: Object.fromEntries(
       privateItems
-        .filter((p) => p.kind === 'result' && quizzes.some((q) => q.id === p.id))
+        .filter(
+          (p) =>
+            p.kind === 'result' &&
+            quizzes.some((q) => q.id === p.id && q.questions.length === p.payload.total),
+        )
         .map((p) => [p.id, p.payload]),
     ),
     draft: item('draft') ?? '',
@@ -112,6 +121,90 @@ export async function writeAccount(userId: string, state: AppData, action: Actio
   const privateSave = (kind: string, id: string, payload: unknown) =>
     check(db.from('private_items').upsert({ user_id: userId, kind, id, payload }));
   switch (action.type) {
+    case 'maze/save': {
+      const m = action.maze;
+      return check(
+        db.from('learning_games').upsert({
+          id: m.id,
+          author_id: userId,
+          title: m.title,
+          level: { start: m.start, goal: m.goal, walls: m.walls, stars: m.stars },
+        }),
+      );
+    }
+    case 'maze/delete':
+    case 'quiz/delete': {
+      const { data: removed, error } = await db
+        .from(action.type === 'maze/delete' ? 'learning_games' : 'quizzes')
+        .delete()
+        .eq('id', action.id)
+        .eq('author_id', userId)
+        .select('id');
+      if (error) throw error;
+      if (!removed?.length) throw new Error('Nothing was deleted. Check ownership and refresh.');
+      return;
+    }
+
+    case 'content/edit': {
+      const c = action.changes;
+      const result = await db
+        .from('posts')
+        .update({
+          caption: c.caption,
+          topic: c.topic,
+          ...(c.title !== undefined ? { title: c.title } : {}),
+          ...(c.thumbnail !== undefined ? { thumbnail: c.thumbnail } : {}),
+          ...(c.image !== undefined ? { image: c.image } : {}),
+          ...(c.videoUrl !== undefined ? { video_url: c.videoUrl } : {}),
+        })
+        .eq('id', action.id)
+        .eq('author_id', userId)
+        .select('id');
+      if (result.error) throw result.error;
+      if (!result.data?.length)
+        throw new Error('Content could not be edited. Check ownership and database setup.');
+      return;
+    }
+    case 'comment/edit':
+    case 'pod/edit':
+    case 'quiz/edit': {
+      const table =
+        action.type === 'comment/edit'
+          ? 'comments'
+          : action.type === 'pod/edit'
+            ? 'pods'
+            : 'quizzes';
+      const item =
+        action.type === 'pod/edit' ? action.pod : action.type === 'quiz/edit' ? action.quiz : null;
+      const fields =
+        action.type === 'comment/edit'
+          ? { text: action.text }
+          : action.type === 'pod/edit'
+            ? {
+                title: action.pod.title,
+                goal: action.pod.goal,
+                minutes: action.pod.minutes,
+                vibe: action.pod.vibe,
+                visibility: action.pod.visibility,
+              }
+            : {
+                title: action.quiz.title,
+                topic: action.quiz.topic,
+                difficulty: action.quiz.difficulty,
+                questions: action.quiz.questions,
+                game: action.quiz.game ?? null,
+              };
+      const result = await db
+        .from(table)
+        .update(fields)
+        .eq('id', item?.id ?? (action as { id: string }).id)
+        .eq('author_id', userId)
+        .select('id');
+      if (result.error) throw result.error;
+      if (!result.data?.length)
+        throw new Error('Nothing was edited. Check ownership and database setup.');
+      return;
+    }
     case 'notebook/save':
       return privateSave('notebook', action.notebook.id, action.notebook);
     case 'exam/save':
@@ -203,6 +296,7 @@ export async function writeAccount(userId: string, state: AppData, action: Actio
           content_id: action.comment.contentId,
           author_id: userId,
           text: action.comment.text,
+          ...(action.comment.parentId ? { parent_id: action.comment.parentId } : {}),
         }),
       );
     case 'content/toggle': {

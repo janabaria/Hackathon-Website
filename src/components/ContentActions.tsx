@@ -9,11 +9,7 @@ import type { Post, Reel } from '../domain/schema';
 
 import { useApp } from '../state/AppProvider';
 
-import { newId } from '../lib/utils';
-
-import { DeleteButton } from './DeleteButton';
-
-import { Avatar, Modal } from './ui';
+import { Modal } from './ui';
 
 export function ContentActions({ content }: { content: Post | Reel }) {
   const t = useT();
@@ -22,10 +18,9 @@ export function ContentActions({ content }: { content: Post | Reel }) {
 
   const [studyOpen, setStudyOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentAnchor, setCommentAnchor] = useState<HTMLElement | null>(null);
 
   const [shareOpen, setShareOpen] = useState(false);
-
-  const [text, setText] = useState('');
 
   const comments = data.comments.filter((comment) => comment.contentId === content.id);
 
@@ -33,39 +28,37 @@ export function ContentActions({ content }: { content: Post | Reel }) {
 
   return (
     <>
-      <div className="content-actions">
-        {isReel && (
+      <div className="content-actions" data-comments-open={commentsOpen && isReel}>
+        {
           <button
-            aria-label="Like reel"
+            aria-label={isReel ? 'Like reel' : 'Like post'}
             aria-pressed={content.liked}
             onClick={() => void commit({ type: 'content/toggle', id: content.id, field: 'liked' })}
           >
             <Heart size={24} fill={content.liked ? 'currentColor' : 'none'} />
             <span>{content.likeCount ?? Number(content.liked)}</span>
           </button>
-        )}
+        }
         <button
           aria-label={t('Study this')}
 
-          aria-pressed={content.liked}
-
           onClick={() => {
             setStudyOpen(true);
-            if (!isReel && !content.liked)
-              void commit({ type: 'content/toggle', id: content.id, field: 'liked' });
           }}
         >
           <BookOpen size={19} />
 
           <span>
             <T>Study this</T>
-            {!isReel && <> · {content.likeCount ?? Number(content.liked)}</>}
           </span>
         </button>
 
         <button
           aria-label={isReel ? 'Comments' : t('Discussions')}
-          onClick={() => setCommentsOpen(true)}
+          onClick={(e) => {
+            setCommentAnchor(e.currentTarget.closest('.reel-card'));
+            setCommentsOpen(true);
+          }}
         >
           <MessageCircle size={19} />
 
@@ -94,77 +87,12 @@ export function ContentActions({ content }: { content: Post | Reel }) {
       </div>
 
       {studyOpen && <StudyActions content={content} onClose={() => setStudyOpen(false)} />}
-      {commentsOpen && isReel && (
-        <ReelComments id={content.id} onClose={() => setCommentsOpen(false)} />
-      )}
-      {commentsOpen && !isReel && (
-        <Modal title="Discussions" onClose={() => setCommentsOpen(false)}>
-          <div className="comments-list">
-            {comments.length ? (
-              comments.map((comment) => (
-                <div className="comment" key={comment.id}>
-                  <Avatar id={comment.authorId} nameOnly />
-
-                  <p>{comment.text}</p>
-                  {comment.authorId === data.profile.id && (
-                    <DeleteButton
-                      label="discussion"
-                      action={{ type: 'comment/delete', id: comment.id }}
-                    />
-                  )}
-                </div>
-              ))
-            ) : (
-              <p className="muted">
-                <T>Start a discussion with a thought or a question.</T>
-              </p>
-            )}
-          </div>
-
-          <form
-            onSubmit={async (event) => {
-              event.preventDefault();
-
-              if (!text.trim()) return;
-
-              if (
-                await commit({
-                  type: 'comment/add',
-
-                  comment: {
-                    id: newId(),
-
-                    contentId: content.id,
-
-                    authorId: data.profile.id,
-
-                    text: text.trim(),
-                  },
-                })
-              )
-                setText('');
-            }}
-          >
-            <label>
-              <T>Your discussion</T>
-              <input
-                autoFocus
-
-                required
-
-                maxLength={500}
-
-                value={text}
-
-                onChange={(e) => setText(e.target.value)}
-              />
-            </label>
-
-            <button className="button primary" disabled={!text.trim()}>
-              <T>Post discussion</T>
-            </button>
-          </form>
-        </Modal>
+      {commentsOpen && (
+        <ReelComments
+          id={content.id}
+          anchor={isReel ? commentAnchor : null}
+          onClose={() => setCommentsOpen(false)}
+        />
       )}
 
       {shareOpen && (

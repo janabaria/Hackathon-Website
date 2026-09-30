@@ -1,16 +1,8 @@
-import { useRef, useState } from 'react';
+import { ReelPreview } from '../components/ReelPreview';
+import { NoteEditor } from '../components/NoteEditor';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import {
-  BookOpen,
-  Plus,
-  CalendarDays,
-  FileText,
-  Bold,
-  Italic,
-  List,
-  Save,
-  Paperclip,
-} from 'lucide-react';
+import { BookOpen, Plus, CalendarDays, FileText, Save, Paperclip } from 'lucide-react';
 import { useApp } from '../state/AppProvider';
 import { newId } from '../lib/utils';
 import type { Notebook } from '../domain/schema';
@@ -121,6 +113,9 @@ export function NotebookPage() {
   const notebook = data.notebooks.find((n) => n.id === id);
   const [selection, setSelection] = useState({ section: '', page: '' });
   const [dirty, setDirty] = useState(false);
+  const [renaming, setRenaming] = useState<'notebook' | 'section' | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [renameSubject, setRenameSubject] = useState('');
   const [adding, setAdding] = useState<'section' | 'page' | null>(null);
   const [name, setName] = useState('');
   const choose = (section: string, page = '') => {
@@ -163,15 +158,86 @@ export function NotebookPage() {
         <BookOpen />
         <div>
           <h1>{notebook.title}</h1>
+          <button
+            className="text-button"
+            onClick={() => {
+              setRenameTitle(notebook.title);
+              setRenameSubject(notebook.subject);
+              setRenaming('notebook');
+            }}
+          >
+            Edit notebook
+          </button>
           <small>{notebook.subject}</small>
         </div>
         <Link className="button secondary" to={`/interact?notebook=${notebook.id}`}>
           Create a quiz
         </Link>
       </div>
+      {renaming && (
+        <Modal
+          title={renaming === 'notebook' ? 'Edit notebook' : 'Rename section'}
+          onClose={() => setRenaming(null)}
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (dirty) {
+                notify('Save your page before renaming.');
+                return;
+              }
+              const next =
+                renaming === 'notebook'
+                  ? { ...notebook, title: renameTitle.trim(), subject: renameSubject.trim() }
+                  : {
+                      ...notebook,
+                      sections: notebook.sections.map((s) =>
+                        s.id === section.id ? { ...s, title: renameTitle.trim() } : s,
+                      ),
+                    };
+              if (await saveBook(next, 'Changes saved.')) setRenaming(null);
+            }}
+          >
+            <label>
+              Name
+              <input
+                required
+                maxLength={120}
+                value={renameTitle}
+                onChange={(e) => setRenameTitle(e.target.value)}
+              />
+            </label>
+            {renaming === 'notebook' && (
+              <label>
+                Subject
+                <input
+                  required
+                  maxLength={120}
+                  value={renameSubject}
+                  onChange={(e) => setRenameSubject(e.target.value)}
+                />
+              </label>
+            )}
+            <button className="button primary" disabled={pending}>
+              Save changes
+            </button>
+          </form>
+        </Modal>
+      )}
       <div className="notebook-workspace">
         <aside className="notebook-section-nav">
           <h3>Sections</h3>
+          {section && (
+            <button
+              className="text-button"
+              onClick={() => {
+                setRenameTitle(section.title);
+                setRenaming('section');
+              }}
+            >
+              Rename section
+            </button>
+          )}
           {notebook.sections.map((s, i) => (
             <button
               key={s.id}
@@ -337,27 +403,11 @@ function NotebookEditor({
   const { data, commit, notify, pending } = useApp();
   const [draft, setDraft] = useState(page);
   const [saved, setSaved] = useState(page);
-  const [preview, setPreview] = useState(false);
   const [attach, setAttach] = useState(false);
   const [deleting, setDeleting] = useState<'page' | 'section' | null>(null);
-  const text = useRef<HTMLTextAreaElement>(null);
   const change = (next: NotePage) => {
     setDraft(next);
     dirtyChange(JSON.stringify(next) !== JSON.stringify(saved));
-  };
-  const format = (prefix: string, suffix = '') => {
-    const el = text.current;
-    if (!el) return;
-    const a = el.selectionStart,
-      b = el.selectionEnd;
-    const value =
-      draft.notes.slice(0, a) +
-      prefix +
-      (draft.notes.slice(a, b) || 'text') +
-      suffix +
-      draft.notes.slice(b);
-    change({ ...draft, notes: value.slice(0, 12000) });
-    el.focus();
   };
   return (
     <section className="notebook-paper">
@@ -368,33 +418,6 @@ function NotebookEditor({
         }}
       >
         <div className="notebook-toolbar">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Bold"
-            onClick={() => format('**', '**')}
-          >
-            <Bold size={17} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Italic"
-            onClick={() => format('*', '*')}
-          >
-            <Italic size={17} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Bullet list"
-            onClick={() => format('\n- ')}
-          >
-            <List size={17} />
-          </button>
-          <button type="button" className="text-button" onClick={() => setPreview(!preview)}>
-            {preview ? 'Edit notes' : 'Preview formatting'}
-          </button>
           <button type="button" className="text-button" onClick={() => setAttach(true)}>
             <Paperclip size={16} />
             Attach
@@ -419,36 +442,11 @@ function NotebookEditor({
           {new Date(notebook.createdAt).toLocaleDateString(data.settings.language)} ·{' '}
           {JSON.stringify(saved) === JSON.stringify(draft) ? 'Saved' : 'Unsaved changes'}
         </small>
-        {preview ? (
-          <div className="note-formatted">
-            {draft.notes.split('\n').map((line, i) => (
-              <p key={i}>
-                {line.startsWith('- ') ? '• ' : ''}
-                {(line.startsWith('- ') ? line.slice(2) : line)
-                  .split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g)
-                  .map((part, j) =>
-                    part.startsWith('**') ? (
-                      <strong key={j}>{part.slice(2, -2)}</strong>
-                    ) : part.startsWith('*') ? (
-                      <em key={j}>{part.slice(1, -1)}</em>
-                    ) : (
-                      part || '\u00a0'
-                    ),
-                  )}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <textarea
-            ref={text}
-            className="note-writing-area"
-            aria-label="Page notes"
-            placeholder="Start writing your notes here…"
-            maxLength={12000}
-            value={draft.notes}
-            onChange={(e) => change({ ...draft, notes: e.target.value })}
-          />
-        )}
+        <NoteEditor
+          notes={draft.notes}
+          html={draft.html}
+          onChange={(notes, html) => change({ ...draft, notes, html })}
+        />
         <div className="note-attachments">
           {draft.contentIds.map((id) => {
             const c = [...data.posts, ...data.reels].find((p) => p.id === id);
@@ -456,6 +454,16 @@ function NotebookEditor({
               <div className="attachment-card" key={id}>
                 {c ? (
                   <Link to={'title' in c ? `/reels?id=${id}` : `/search?content=${id}`}>
+                    {c.videoUrl && (
+                      <ReelPreview
+                        reel={{
+                          title: 'title' in c ? c.title : c.caption.slice(0, 80),
+                          topic: c.topic,
+                          videoUrl: c.videoUrl,
+                          thumbnail: c.thumbnail,
+                        }}
+                      />
+                    )}
                     <Topic topic={c.topic} />
                     <strong>{'title' in c ? c.title : c.caption.slice(0, 120)}</strong>
                   </Link>
